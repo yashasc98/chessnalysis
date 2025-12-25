@@ -2,7 +2,7 @@
 
 **Version:** 1.0  
 **Date:** 2025-12-25  
-**Authors:** Yashas Chandra
+**Authors:** Yashas Chandra  
 **Scope:** Multiplayer chess MVP (authentication, user identity, matchmaking, game clocks, real-time play)
 
 ---
