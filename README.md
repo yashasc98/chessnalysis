@@ -49,14 +49,14 @@ This project is a **multiplayer chess web application** (MVP) with:
 - Java 21+
 - Node.js 18+ (for frontend)
 - Maven or Gradle
-- Supabase account (free tier)
+- Supabase account (free tier works)
 - npm or yarn
 
 ### Backend Setup
 
 1. Clone the repo:
 ```bash
-git clone <repo-url>
+git clone https://github.com/yashasc98/chessnalysis.git
 cd backend
 ```
 
@@ -74,7 +74,7 @@ spring:
 ./mvnw spring-boot:run
 ```
 
-### Backend Setup
+### Frontend Setup
 
 1. Navigate to frontend:
 ```
@@ -92,11 +92,11 @@ yarn install
 
 3. Run frontend:
 ```
-npm start
+npm run dev
 ```
 or
 ```
-yarn start
+yarn run dev
 ```
 
 4. Open your browser at http://localhost:3000.
@@ -113,7 +113,7 @@ controller, service, dao, domain, dto, websocket, config, util, exception
 
 React functional components
 ```
-Folders: pages, components, services, hooks, models, utils, styles
+pages, components, services, hooks, models, utils, styles
 ```
 
 ### Contributing
