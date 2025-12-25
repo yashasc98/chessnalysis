@@ -48,7 +48,7 @@ This project is a **multiplayer chess web application** (MVP) with:
 
 - Java 21+
 - Node.js 18+ (for frontend)
-- Maven or Gradle
+- Maven
 - Supabase account (free tier works)
 - npm or yarn
 
@@ -71,7 +71,7 @@ spring:
 
 3. Run the backend:
 ```
-./mvnw spring-boot:run
+mvn spring-boot:run
 ```
 
 ### Frontend Setup
