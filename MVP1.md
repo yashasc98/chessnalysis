@@ -46,6 +46,7 @@ The **frontend is stateless**, and the backend is authoritative for game state.
 
 ### 3.1 Package Structure
 
+```
 com.chessnalysis
 │
 ├── ChessApplication
@@ -83,7 +84,7 @@ com.chessnalysis
 └── util
 ├── IdGenerator
 └── TimeUtil
-
+```
 
 ### 3.2 Key Components
 
@@ -115,6 +116,7 @@ CREATED -> MATCHED -> IN_PROGRESS -> FINISHED
 
 ### 4.1 Project Structure
 
+```
 src
 ├── app (App.tsx, routes.tsx, AuthGuard.tsx)
 ├── pages (LoginPage, LobbyPage, GamePage)
@@ -127,6 +129,7 @@ src
 ├── models (GameState, Move, Clock)
 ├── utils (fen.ts, time.ts)
 └── styles (theme.css)
+```
 
 ### 4.2 Key Libraries
 
