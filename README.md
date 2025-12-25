@@ -85,7 +85,7 @@ cd frontend
 ```
 npm install
 ```
-# or
+or
 ```
 yarn install
 ```
@@ -94,7 +94,7 @@ yarn install
 ```
 npm start
 ```
-# or
+or
 ```
 yarn start
 ```
