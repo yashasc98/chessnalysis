@@ -1,0 +1,75 @@
+package com.chessnalysis.websocket.interceptor;
+
+import com.chessnalysis.security.CustomUserDetails;
+import com.chessnalysis.security.jwt.JwtProvider;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.simp.stomp.StompCommand;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.messaging.support.ChannelInterceptor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import java.util.Collections;
+
+/**
+ * WebSocket interceptor for JWT authentication on STOMP connections.
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class WebSocketAuthInterceptor implements ChannelInterceptor {
+
+	private static final String AUTHORIZATION_HEADER = "Authorization";
+	private static final String BEARER_PREFIX = "Bearer ";
+
+	private final JwtProvider jwtProvider;
+
+	@Override
+	public Message<?> preSend(Message<?> message, MessageChannel channel) {
+		StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+
+		// Only authenticate on CONNECT command
+		if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+			String token = extractToken(accessor);
+
+			if (StringUtils.hasText(token) && jwtProvider.validateToken(token)) {
+				Long userId = jwtProvider.getUserIdFromToken(token);
+				String username = jwtProvider.getUsernameFromToken(token);
+				String role = jwtProvider.getRoleFromToken(token);
+
+				CustomUserDetails userDetails = new CustomUserDetails(userId, username, role);
+
+				UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+					userDetails,
+					null,
+					Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
+				);
+
+				accessor.setUser(authentication);
+				log.debug("WebSocket authenticated for user: {}", username);
+			} else {
+				log.warn("WebSocket connection rejected: invalid or missing token");
+				return null;
+			}
+		}
+
+		return message;
+	}
+
+	/**
+	 * Extract JWT token from STOMP headers.
+	 */
+	private String extractToken(StompHeaderAccessor accessor) {
+		String authHeader = accessor.getFirstNativeHeader(AUTHORIZATION_HEADER);
+		if (StringUtils.hasText(authHeader) && authHeader.startsWith(BEARER_PREFIX)) {
+			return authHeader.substring(BEARER_PREFIX.length());
+		}
+		return null;
+	}
+}
+
