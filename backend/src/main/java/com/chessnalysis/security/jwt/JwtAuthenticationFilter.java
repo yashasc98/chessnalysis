@@ -1,5 +1,7 @@
 package com.chessnalysis.security.jwt;
 
+import com.chessnalysis.dao.user.UserRepository;
+import com.chessnalysis.domain.user.User;
 import com.chessnalysis.security.CustomUserDetails;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -27,6 +29,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	private static final String BEARER_PREFIX = "Bearer ";
 
 	private final JwtProvider jwtProvider;
+	private final UserRepository userRepository;
 
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -40,7 +43,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 				String username = jwtProvider.getUsernameFromToken(token);
 				String role = jwtProvider.getRoleFromToken(token);
 
-				CustomUserDetails userDetails = new CustomUserDetails(userId, username, role);
+				User user = userRepository.findById(userId).orElse(null);
+				if (user == null) {
+					log.warn("User not found for userId: {}", userId);
+					filterChain.doFilter(request, response);
+					return;
+				}
+
+				CustomUserDetails userDetails = new CustomUserDetails(userId, username, role, user);
 
 				UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
 					userDetails,

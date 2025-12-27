@@ -1,5 +1,6 @@
 package com.chessnalysis.config;
 
+import com.chessnalysis.dao.user.UserRepository;
 import com.chessnalysis.security.jwt.JwtAuthenticationFilter;
 import com.chessnalysis.security.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
@@ -36,35 +37,35 @@ public class SecurityConfig {
 
 	/**
 	 * JWT authentication filter.
+	 * The UserRepository is provided as a parameter so Spring injects it when creating the bean.
 	 */
 	@Bean
-	public JwtAuthenticationFilter jwtAuthenticationFilter() {
-		return new JwtAuthenticationFilter(jwtProvider);
+	public JwtAuthenticationFilter jwtAuthenticationFilter(UserRepository userRepository) {
+		return new JwtAuthenticationFilter(jwtProvider, userRepository);
 	}
 
 	/**
 	 * Security filter chain configuration.
 	 */
 	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+	public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) {
 		http
 			.cors(AbstractHttpConfigurer::disable)
 			.csrf(AbstractHttpConfigurer::disable)
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> auth
-				// Public endpoints
-				.requestMatchers("/api/auth/**").permitAll()
+					// Public endpoints
+					.requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
 
-				// Actuator - only for ADMIN
-				.requestMatchers("/actuator/**").hasRole("ADMIN")
+					// Actuator - only for ADMIN
+					.requestMatchers("/actuator/**").hasRole("ADMIN")
 
-				// All other endpoints require authentication
-				.anyRequest().authenticated()
-			)
-			.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+					// All other endpoints require authentication
+					.anyRequest().authenticated()
+				)
+			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
 		return http.build();
 	}
 }
-

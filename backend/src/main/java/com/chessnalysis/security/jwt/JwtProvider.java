@@ -3,6 +3,7 @@ package com.chessnalysis.security.jwt;
 import com.chessnalysis.domain.user.User;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,7 +25,12 @@ public class JwtProvider {
 	@Value("${auth.jwt.secret:${jwt.secret:chess-nalysis-secret-key-min-256-bits-for-hs256}}")
 	private String jwtSecret;
 
-	@Value("${auth.jwt.expiration:3600000}")
+    /**
+     * -- GETTER --
+     *  Get JWT expiration duration in milliseconds.
+     */
+    @Getter
+    @Value("${auth.jwt.expiration:3600000}")
 	private long jwtExpiration;
 
 	/**
@@ -93,7 +99,7 @@ public class JwtProvider {
 		}
 	}
 
-	/**
+    /**
 	 * Parse and return JWT claims.
 	 */
 	private Claims parseToken(String token) {

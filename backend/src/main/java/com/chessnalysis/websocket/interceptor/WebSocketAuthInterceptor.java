@@ -1,5 +1,7 @@
 package com.chessnalysis.websocket.interceptor;
 
+import com.chessnalysis.dao.user.UserRepository;
+import com.chessnalysis.domain.user.User;
 import com.chessnalysis.security.CustomUserDetails;
 import com.chessnalysis.security.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 	private static final String BEARER_PREFIX = "Bearer ";
 
 	private final JwtProvider jwtProvider;
+	private final UserRepository userRepository;
 
 	@Override
 	public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -42,7 +45,13 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 				String username = jwtProvider.getUsernameFromToken(token);
 				String role = jwtProvider.getRoleFromToken(token);
 
-				CustomUserDetails userDetails = new CustomUserDetails(userId, username, role);
+				User user = userRepository.findById(userId).orElse(null);
+				if (user == null) {
+					log.warn("WebSocket auth failed - user not found: {}", userId);
+					return null;
+				}
+
+				CustomUserDetails userDetails = new CustomUserDetails(userId, username, role, user);
 
 				UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
 					userDetails,
