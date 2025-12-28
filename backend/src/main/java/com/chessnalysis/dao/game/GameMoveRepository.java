@@ -14,12 +14,12 @@ import java.util.UUID;
 @Repository
 public interface GameMoveRepository extends JpaRepository<GameMove, Long> {
 
-	List<GameMove> findByGameIdOrderByMoveNumberAsc(UUID gameId);
+    List<GameMove> findByGameIdOrderByMoveNumberAsc(UUID gameId);
 
-	@Query("SELECT gm FROM GameMove gm WHERE gm.gameId = :gameId ORDER BY gm.moveNumber DESC LIMIT 1")
-	List<GameMove> findLastMove(UUID gameId);
+    @Query("SELECT gm FROM GameMove gm WHERE gm.gameId = :gameId ORDER BY gm.moveNumber DESC LIMIT 1")
+    List<GameMove> findLastMove(UUID gameId);
 
-	@Query("SELECT COUNT(gm) FROM GameMove gm WHERE gm.gameId = :gameId")
-	int countMovesByGameId(UUID gameId);
+    @Query("SELECT COUNT(gm) FROM GameMove gm WHERE gm.gameId = :gameId")
+    int countMovesByGameId(UUID gameId);
 }
 

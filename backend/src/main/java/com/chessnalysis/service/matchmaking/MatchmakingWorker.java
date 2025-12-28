@@ -18,34 +18,34 @@ import java.util.Arrays;
 @RequiredArgsConstructor
 public class MatchmakingWorker {
 
-	private final MatchmakingService matchmakingService;
+    private final MatchmakingService matchmakingService;
 
-	/**
-	 * Poll all queues and attempt to create matches.
-	 * Runs every 500ms (configurable).
-	 */
-	@Scheduled(fixedDelay = 500, initialDelay = 1000)
-	public void processMatches() {
-		Arrays.stream(TimeControl.values())
-			.forEach(this::tryMatchForTimeControl);
-	}
+    /**
+     * Poll all queues and attempt to create matches.
+     * Runs every 500ms (configurable).
+     */
+    @Scheduled(fixedDelay = 500, initialDelay = 1000)
+    public void processMatches() {
+        Arrays.stream(TimeControl.values())
+                .forEach(this::tryMatchForTimeControl);
+    }
 
-	/**
-	 * Attempt to create matches for a specific time control.
-	 * Handles multiple pairs if available.
-	 */
-	private void tryMatchForTimeControl(TimeControl timeControl) {
-		try {
-			while (matchmakingService.getQueueSize(timeControl) >= 2) {
-				var match = matchmakingService.tryCreateMatch(timeControl);
-				if (match.isEmpty()) {
-					// No more pairs available
-					break;
-				}
-			}
-		} catch (Exception e) {
-			log.error("Error during matchmaking for {}: ", timeControl, e);
-		}
-	}
+    /**
+     * Attempt to create matches for a specific time control.
+     * Handles multiple pairs if available.
+     */
+    private void tryMatchForTimeControl(TimeControl timeControl) {
+        try {
+            while (matchmakingService.getQueueSize(timeControl) >= 2) {
+                var match = matchmakingService.tryCreateMatch(timeControl);
+                if (match.isEmpty()) {
+                    // No more pairs available
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error during matchmaking for {}: ", timeControl, e);
+        }
+    }
 }
 

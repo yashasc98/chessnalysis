@@ -15,15 +15,15 @@ import java.util.UUID;
 @Repository
 public interface GameSessionRepository extends JpaRepository<GameSession, UUID> {
 
-	Optional<GameSession> findById(UUID gameId);
+    Optional<GameSession> findById(UUID gameId);
 
-	@Query("SELECT gs FROM GameSession gs WHERE gs.whitePlayerId = :playerId OR gs.blackPlayerId = :playerId")
-	List<GameSession> findByPlayerId(Long playerId);
+    @Query("SELECT gs FROM GameSession gs WHERE gs.whitePlayerId = :playerId OR gs.blackPlayerId = :playerId")
+    List<GameSession> findByPlayerId(Long playerId);
 
-	@Query("SELECT gs FROM GameSession gs WHERE (gs.whitePlayerId = :playerId OR gs.blackPlayerId = :playerId) AND gs.gameState = 'ACTIVE'")
-	List<GameSession> findActiveGamesByPlayerId(Long playerId);
+    @Query("SELECT gs FROM GameSession gs WHERE (gs.whitePlayerId = :playerId OR gs.blackPlayerId = :playerId) AND gs.gameState = 'ACTIVE'")
+    List<GameSession> findActiveGamesByPlayerId(Long playerId);
 
-	@Query("SELECT gs FROM GameSession gs WHERE gs.gameState = 'PENDING' ORDER BY gs.createdAt DESC LIMIT 10")
-	List<GameSession> findRecentPendingGames();
+    @Query("SELECT gs FROM GameSession gs WHERE gs.gameState = 'PENDING' ORDER BY gs.createdAt DESC LIMIT 10")
+    List<GameSession> findRecentPendingGames();
 }
 

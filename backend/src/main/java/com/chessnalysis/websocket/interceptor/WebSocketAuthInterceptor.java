@@ -26,59 +26,59 @@ import java.util.Collections;
 @RequiredArgsConstructor
 public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
-	private static final String AUTHORIZATION_HEADER = "Authorization";
-	private static final String BEARER_PREFIX = "Bearer ";
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
 
-	private final JwtProvider jwtProvider;
-	private final UserRepository userRepository;
+    private final JwtProvider jwtProvider;
+    private final UserRepository userRepository;
 
-	@Override
-	public Message<?> preSend(Message<?> message, MessageChannel channel) {
-		StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+    @Override
+    public Message<?> preSend(Message<?> message, MessageChannel channel) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
 
-		// Only authenticate on CONNECT command
-		if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-			String token = extractToken(accessor);
+        // Only authenticate on CONNECT command
+        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+            String token = extractToken(accessor);
 
-			if (StringUtils.hasText(token) && jwtProvider.validateToken(token)) {
-				Long userId = jwtProvider.getUserIdFromToken(token);
-				String username = jwtProvider.getUsernameFromToken(token);
-				String role = jwtProvider.getRoleFromToken(token);
+            if (StringUtils.hasText(token) && jwtProvider.validateToken(token)) {
+                Long userId = jwtProvider.getUserIdFromToken(token);
+                String username = jwtProvider.getUsernameFromToken(token);
+                String role = jwtProvider.getRoleFromToken(token);
 
-				User user = userRepository.findById(userId).orElse(null);
-				if (user == null) {
-					log.warn("WebSocket auth failed - user not found: {}", userId);
-					return null;
-				}
+                User user = userRepository.findById(userId).orElse(null);
+                if (user == null) {
+                    log.warn("WebSocket auth failed - user not found: {}", userId);
+                    return null;
+                }
 
-				CustomUserDetails userDetails = new CustomUserDetails(userId, username, role, user);
+                CustomUserDetails userDetails = new CustomUserDetails(userId, username, role, user);
 
-				UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-					userDetails,
-					null,
-					Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
-				);
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
+                );
 
-				accessor.setUser(authentication);
-				log.debug("WebSocket authenticated for user: {}", username);
-			} else {
-				log.warn("WebSocket connection rejected: invalid or missing token");
-				return null;
-			}
-		}
+                accessor.setUser(authentication);
+                log.debug("WebSocket authenticated for user: {}", username);
+            } else {
+                log.warn("WebSocket connection rejected: invalid or missing token");
+                return null;
+            }
+        }
 
-		return message;
-	}
+        return message;
+    }
 
-	/**
-	 * Extract JWT token from STOMP headers.
-	 */
-	private String extractToken(StompHeaderAccessor accessor) {
-		String authHeader = accessor.getFirstNativeHeader(AUTHORIZATION_HEADER);
-		if (StringUtils.hasText(authHeader) && authHeader.startsWith(BEARER_PREFIX)) {
-			return authHeader.substring(BEARER_PREFIX.length());
-		}
-		return null;
-	}
+    /**
+     * Extract JWT token from STOMP headers.
+     */
+    private String extractToken(StompHeaderAccessor accessor) {
+        String authHeader = accessor.getFirstNativeHeader(AUTHORIZATION_HEADER);
+        if (StringUtils.hasText(authHeader) && authHeader.startsWith(BEARER_PREFIX)) {
+            return authHeader.substring(BEARER_PREFIX.length());
+        }
+        return null;
+    }
 }
 

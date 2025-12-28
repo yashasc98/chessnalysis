@@ -25,58 +25,58 @@ import java.util.Collections;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-	private static final String AUTHORIZATION_HEADER = "Authorization";
-	private static final String BEARER_PREFIX = "Bearer ";
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
 
-	private final JwtProvider jwtProvider;
-	private final UserRepository userRepository;
+    private final JwtProvider jwtProvider;
+    private final UserRepository userRepository;
 
-	@Override
-	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-		throws ServletException, IOException {
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
 
-		try {
-			String token = extractToken(request);
+        try {
+            String token = extractToken(request);
 
-			if (StringUtils.hasText(token) && jwtProvider.validateToken(token)) {
-				Long userId = jwtProvider.getUserIdFromToken(token);
-				String username = jwtProvider.getUsernameFromToken(token);
-				String role = jwtProvider.getRoleFromToken(token);
+            if (StringUtils.hasText(token) && jwtProvider.validateToken(token)) {
+                Long userId = jwtProvider.getUserIdFromToken(token);
+                String username = jwtProvider.getUsernameFromToken(token);
+                String role = jwtProvider.getRoleFromToken(token);
 
-				User user = userRepository.findById(userId).orElse(null);
-				if (user == null) {
-					log.warn("User not found for userId: {}", userId);
-					filterChain.doFilter(request, response);
-					return;
-				}
+                User user = userRepository.findById(userId).orElse(null);
+                if (user == null) {
+                    log.warn("User not found for userId: {}", userId);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
 
-				CustomUserDetails userDetails = new CustomUserDetails(userId, username, role, user);
+                CustomUserDetails userDetails = new CustomUserDetails(userId, username, role, user);
 
-				UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-					userDetails,
-					null,
-					Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
-				);
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
+                );
 
-				SecurityContextHolder.getContext().setAuthentication(authentication);
-				log.debug("JWT token validated for user: {}", username);
-			}
-		} catch (Exception e) {
-			log.error("Failed to set user authentication: {}", e.getMessage());
-		}
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+                log.debug("JWT token validated for user: {}", username);
+            }
+        } catch (Exception e) {
+            log.error("Failed to set user authentication: {}", e.getMessage());
+        }
 
-		filterChain.doFilter(request, response);
-	}
+        filterChain.doFilter(request, response);
+    }
 
-	/**
-	 * Extract JWT token from request header.
-	 */
-	private String extractToken(HttpServletRequest request) {
-		String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
-		if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_PREFIX)) {
-			return bearerToken.substring(BEARER_PREFIX.length());
-		}
-		return null;
-	}
+    /**
+     * Extract JWT token from request header.
+     */
+    private String extractToken(HttpServletRequest request) {
+        String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_PREFIX)) {
+            return bearerToken.substring(BEARER_PREFIX.length());
+        }
+        return null;
+    }
 }
 

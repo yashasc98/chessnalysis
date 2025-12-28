@@ -25,47 +25,40 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-	private final JwtProvider jwtProvider;
+    private final JwtProvider jwtProvider;
 
-	/**
-	 * Password encoder using BCrypt.
-	 */
-	@Bean
-	public PasswordEncoder passwordEncoder() {
-		return new BCryptPasswordEncoder();
-	}
+    /**
+     * Password encoder using BCrypt.
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
-	/**
-	 * JWT authentication filter.
-	 * The UserRepository is provided as a parameter so Spring injects it when creating the bean.
-	 */
-	@Bean
-	public JwtAuthenticationFilter jwtAuthenticationFilter(UserRepository userRepository) {
-		return new JwtAuthenticationFilter(jwtProvider, userRepository);
-	}
+    /**
+     * JWT authentication filter.
+     * The UserRepository is provided as a parameter so Spring injects it when creating the bean.
+     */
+    @Bean
+    public JwtAuthenticationFilter jwtAuthenticationFilter(UserRepository userRepository) {
+        return new JwtAuthenticationFilter(jwtProvider, userRepository);
+    }
 
-	/**
-	 * Security filter chain configuration.
-	 */
-	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) {
-		http
-			.cors(AbstractHttpConfigurer::disable)
-			.csrf(AbstractHttpConfigurer::disable)
-			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-			.authorizeHttpRequests(auth -> auth
-					// Public endpoints
-					.requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+    /**
+     * Security filter chain configuration.
+     */
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) {
+        http.cors(AbstractHttpConfigurer::disable).csrf(AbstractHttpConfigurer::disable).sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)).authorizeHttpRequests(auth -> auth
+                // Public endpoints
+                .requestMatchers("/api/auth/**").permitAll().requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
 
-					// Actuator - only for ADMIN
-					.requestMatchers("/actuator/**").hasRole("ADMIN")
+                // Actuator - only for ADMIN
+                .requestMatchers("/actuator/**").hasRole("ADMIN")
 
-					// All other endpoints require authentication
-					.anyRequest().authenticated()
-				)
-			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                // All other endpoints require authentication
+                .anyRequest().authenticated()).addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
-		return http.build();
-	}
+        return http.build();
+    }
 }

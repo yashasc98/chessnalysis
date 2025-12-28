@@ -10,21 +10,12 @@ import org.springframework.context.annotation.Profile;
 
 @Profile({"dev", "test"})
 @Configuration
-@SecurityScheme(
-        name = "bearerAuth",
-        type = SecuritySchemeType.HTTP,
-        scheme = "bearer",
-        bearerFormat = "JWT"
-)
+@SecurityScheme(name = "bearerAuth", type = SecuritySchemeType.HTTP, scheme = "bearer", bearerFormat = "JWT")
 public class OpenApiConfig {
 
     @Bean
     public OpenAPI customOpenAPI() {
-        return new OpenAPI()
-                .info(new Info()
-                        .title("ChessNalysis API")
-                        .version("1.0.0")
-                        .description("API documentation for ChessNalysis Backend"));
+        return new OpenAPI().info(new Info().title("ChessNalysis API").version("1.0.0").description("API documentation for ChessNalysis Backend"));
     }
 
 }

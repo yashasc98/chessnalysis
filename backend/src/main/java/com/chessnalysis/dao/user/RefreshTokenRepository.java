@@ -17,13 +17,13 @@ import java.util.Optional;
 @Repository
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
 
-	List<RefreshToken> findByUserAndRevokedFalse(User user);
+    List<RefreshToken> findByUserAndRevokedFalse(User user);
 
     Optional<RefreshToken> findByUserAndDeviceId(User user, String deviceId);
 
-	void deleteByExpiresAtBefore(LocalDateTime expiryDate);
+    void deleteByExpiresAtBefore(LocalDateTime expiryDate);
 
-	@Query("SELECT rt FROM RefreshToken rt WHERE rt.revoked = false AND rt.expiresAt > CURRENT_TIMESTAMP ORDER BY rt.createdAt DESC")
-	List<RefreshToken> findAllValidTokens();
+    @Query("SELECT rt FROM RefreshToken rt WHERE rt.revoked = false AND rt.expiresAt > CURRENT_TIMESTAMP ORDER BY rt.createdAt DESC")
+    List<RefreshToken> findAllValidTokens();
 }
 

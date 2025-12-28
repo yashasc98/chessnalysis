@@ -7,5 +7,6 @@ import java.util.UUID;
  * For safety clients can provide queueId, but server will primarily use authenticated userId.
  */
 public record LeaveQueueRequest(
-	UUID queueId
-) {}
+        UUID queueId
+) {
+}

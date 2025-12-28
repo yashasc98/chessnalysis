@@ -14,19 +14,7 @@ import java.util.UUID;
  * Enables device-specific logout and token rotation.
  */
 @Entity
-@Table(
-        name = "refresh_tokens",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uq_refresh_token_user_device",
-                        columnNames = {"user_id", "device_id"}
-                )
-        },
-        indexes = {
-                @Index(name = "idx_refresh_token_user_id", columnList = "user_id"),
-                @Index(name = "idx_refresh_token_device_id", columnList = "device_id")
-        }
-)
+@Table(name = "refresh_tokens", uniqueConstraints = {@UniqueConstraint(name = "uq_refresh_token_user_device", columnNames = {"user_id", "device_id"})}, indexes = {@Index(name = "idx_refresh_token_user_id", columnList = "user_id"), @Index(name = "idx_refresh_token_device_id", columnList = "device_id")})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

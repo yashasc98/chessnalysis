@@ -27,44 +27,41 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AuthController {
 
-	private final AuthService authService;
+    private final AuthService authService;
 
-	/**
-	 * Register a new user.
-	 */
-	@PostMapping("/register")
-	public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
-		RegisterResponse response = authService.register(request);
-		return ResponseEntity.status(HttpStatus.CREATED).body(response);
-	}
+    /**
+     * Register a new user.
+     */
+    @PostMapping("/register")
+    public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
+        RegisterResponse response = authService.register(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
 
-	/**
-	 * Login and obtain JWT token and refresh token.
-	 */
-	@PostMapping("/login")
-	public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-		LoginResponse response = authService.login(request);
-		return ResponseEntity.ok(response);
-	}
+    /**
+     * Login and obtain JWT token and refresh token.
+     */
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        LoginResponse response = authService.login(request);
+        return ResponseEntity.ok(response);
+    }
 
-	/**
-	 * Refresh access token using refresh token.
-	 */
-	@PostMapping("/refresh")
-	public ResponseEntity<RefreshTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
-		RefreshTokenResponse response = authService.refresh(request);
-		return ResponseEntity.ok(response);
-	}
+    /**
+     * Refresh access token using refresh token.
+     */
+    @PostMapping("/refresh")
+    public ResponseEntity<RefreshTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        RefreshTokenResponse response = authService.refresh(request);
+        return ResponseEntity.ok(response);
+    }
 
-	/**
-	 * Logout from a specific device by revoking its refresh token.
-	 */
-	@PostMapping("/logout")
-	public ResponseEntity<LogoutResponse> logout(
-		@AuthenticationPrincipal CustomUserDetails userDetails,
-		@Valid @RequestBody LogoutRequest request
-	) {
-		authService.logout(userDetails.user(), request.deviceId());
-		return ResponseEntity.ok(new LogoutResponse("Logout successful"));
-	}
+    /**
+     * Logout from a specific device by revoking its refresh token.
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<LogoutResponse> logout(@AuthenticationPrincipal CustomUserDetails userDetails, @Valid @RequestBody LogoutRequest request) {
+        authService.logout(userDetails.user(), request.deviceId());
+        return ResponseEntity.ok(new LogoutResponse("Logout successful"));
+    }
 }

@@ -15,22 +15,21 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class MatchmakingController {
 
-	private final MatchmakingService matchmakingService;
+    private final MatchmakingService matchmakingService;
 
-	/**
-	 * Get current queue size for a time control.
-	 * Useful for UI to show how many players are waiting.
-	 */
-	@GetMapping("/queue-size")
-	public ResponseEntity<QueueSizeResponse> getQueueSize(
-		@RequestParam TimeControl timeControl
-	) {
-		int size = matchmakingService.getQueueSize(timeControl);
-		return ResponseEntity.ok(new QueueSizeResponse(timeControl.getDisplayName(), size));
-	}
+    /**
+     * Get current queue size for a time control.
+     * Useful for UI to show how many players are waiting.
+     */
+    @GetMapping("/queue-size")
+    public ResponseEntity<QueueSizeResponse> getQueueSize(@RequestParam TimeControl timeControl) {
+        int size = matchmakingService.getQueueSize(timeControl);
+        return ResponseEntity.ok(new QueueSizeResponse(timeControl.getDisplayName(), size));
+    }
 
-	/**
-	 * Response DTO for queue size.
-	 */
-	public record QueueSizeResponse(String timeControl, int queueSize) {}
+    /**
+     * Response DTO for queue size.
+     */
+    public record QueueSizeResponse(String timeControl, int queueSize) {
+    }
 }

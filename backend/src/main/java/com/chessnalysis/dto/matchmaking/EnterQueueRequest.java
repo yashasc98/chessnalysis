@@ -7,5 +7,6 @@ import com.chessnalysis.domain.game.TimeControl;
  * Request DTO for entering the matchmaking queue.
  */
 public record EnterQueueRequest(
-	@NotNull TimeControl timeControl
-) {}
+        @NotNull TimeControl timeControl
+) {
+}

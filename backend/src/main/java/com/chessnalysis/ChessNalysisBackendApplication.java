@@ -8,8 +8,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class ChessNalysisBackendApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(ChessNalysisBackendApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(ChessNalysisBackendApplication.class, args);
+    }
 
 }

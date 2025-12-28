@@ -1,162 +1,181 @@
 package com.chessnalysis.service.game;
 
-import com.chessnalysis.dao.game.GameMoveRepository;
-import com.chessnalysis.dao.game.GameSessionRepository;
-import com.chessnalysis.domain.game.GameMove;
-import com.chessnalysis.domain.game.GameSession;
-import com.chessnalysis.domain.game.GameState;
-import com.chessnalysis.domain.game.TimeControl;
+import com.chessnalysis.dao.game.GameRepository;
+import com.chessnalysis.domain.game.*;
 import com.chessnalysis.exception.ResourceNotFoundException;
+import com.chessnalysis.websocket.notifier.WebSocketNotifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Service for managing chess game sessions and moves.
- * Handles game creation, state management, and move persistence.
+ * Service orchestrating all game play operations.
+ * Acts as the primary entry point for game actions (move, resign, draw).
+ * Coordinates between GameRegistry (in-memory), GameEngine (logic), and persistence.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class GameService {
 
-	private final GameSessionRepository gameSessionRepository;
-	private final GameMoveRepository gameMoveRepository;
+    private final GameRegistry gameRegistry;
+    private final GameRepository gameRepository;
+    private final WebSocketNotifier webSocketNotifier;
 
-	/**
-	 * Create a new game session with two players.
-	 * Initializes game to PENDING state with starting FEN.
-	 */
-	@Transactional
-	public GameSession createGame(long whitePlayerId, long blackPlayerId, TimeControl timeControl) {
-		UUID gameId = UUID.randomUUID();
+    /**
+     * Create a new game from a matchmaking result.
+     * Registers the game in memory and persists it.
+     */
+    @Transactional
+    public Game createGame(UUID gameId, long whitePlayerId, long blackPlayerId, TimeControl timeControl) {
+        Game game = new Game(gameId, whitePlayerId, blackPlayerId, timeControl);
+        gameRegistry.register(game);
 
-		GameSession game = GameSession.builder()
-			.id(gameId)
-			.whitePlayerId(whitePlayerId)
-			.blackPlayerId(blackPlayerId)
-			.timeControl(timeControl)
-			.gameState(GameState.PENDING)
-			.currentFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-			.build();
+        // Persist game metadata
+        GameSession session = GameSession.builder().id(gameId).whitePlayerId(whitePlayerId).blackPlayerId(blackPlayerId).timeControl(timeControl).gameState(GameState.PENDING).currentFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").build();
+        gameRepository.save(session);
 
-		GameSession saved = gameSessionRepository.save(game);
-		log.info("Game created: gameId={}, whitePlayer={}, blackPlayer={}, timeControl={}",
-			gameId, whitePlayerId, blackPlayerId, timeControl);
+        log.info("Game created and registered: {}", gameId);
+        return game;
+    }
 
-		return saved;
-	}
+    /**
+     * Start a game (transition PENDING → ACTIVE).
+     * Sends GAME_STARTED event to both players.
+     */
+    @Transactional
+    public void startGame(UUID gameId) throws Exception {
+        gameRegistry.withWriteLock(gameId, game -> {
+            if (game.getState() != GameState.PENDING) {
+                throw new IllegalStateException("Game is not PENDING");
+            }
 
-	/**
-	 * Transition a game from PENDING to ACTIVE.
-	 */
-	@Transactional
-	public void startGame(UUID gameId) {
-		GameSession game = gameSessionRepository.findById(gameId)
-			.orElseThrow(() -> new ResourceNotFoundException("Game not found: " + gameId));
+            game.start();
 
-		if (game.getGameState() == GameState.PENDING) {
-			game.setGameState(GameState.ACTIVE);
-			game.setStartedAt(Instant.now());
-			gameSessionRepository.save(game);
-			log.info("Game started: gameId={}", gameId);
-		}
-	}
+            // Update persistence
+            GameSession session = gameRepository.findById(gameId).orElseThrow(() -> new ResourceNotFoundException("GameSession not found"));
+            session.setGameState(GameState.ACTIVE);
+            gameRepository.save(session);
 
-	/**
-	 * Record a move in a game.
-	 * Validates that the move is by one of the players.
-	 */
-	@Transactional
-	public void applyMove(UUID gameId, String moveUci, String fromSquare, String toSquare, String sanNotation, long byPlayerId) {
-		GameSession game = gameSessionRepository.findById(gameId)
-			.orElseThrow(() -> new ResourceNotFoundException("Game not found: " + gameId));
+            // Notify players
+            webSocketNotifier.notifyGameStarted(gameId, game.getWhitePlayerId(), game.getBlackPlayerId(), game.getTimeControl());
 
-		// Validate player ownership
-		if (byPlayerId != game.getWhitePlayerId() && byPlayerId != game.getBlackPlayerId()) {
-			log.warn("Unauthorized move attempt: gameId={}, playerId={}", gameId, byPlayerId);
-			throw new IllegalArgumentException("Player not part of this game");
-		}
+            log.info("Game started: {}", gameId);
+        });
+    }
 
-		// Get move count to determine move number
-		int moveCount = gameMoveRepository.countMovesByGameId(gameId);
-		int moveNumber = moveCount + 1;
+    /**
+     * Apply a move to a game.
+     * Validates turn order, legality, and updates state.
+     * Sends MOVE_APPLIED or ILLEGAL_MOVE event.
+     */
+    @Transactional
+    public void applyMove(UUID gameId, String moveUci, long playerId) throws Exception {
+        gameRegistry.withWriteLock(gameId, game -> {
+            if (!game.applyMove(moveUci, playerId)) {
+                // Move was illegal or game ended
+                webSocketNotifier.notifyIllegalMove(gameId, moveUci, "Illegal move");
+                return;
+            }
 
-		GameMove move = GameMove.builder()
-			.gameId(gameId)
-			.moveNumber(moveNumber)
-			.fromSquare(fromSquare)
-			.toSquare(toSquare)
-			.moveUci(moveUci)
-			.sanNotation(sanNotation)
-			.byPlayerId(byPlayerId)
-			.build();
+            // Move was valid
+            Color movedColor = game.getEngine().getTurn().opposite(); // Already switched
+            String san = "";  // TODO: Implement SAN conversion if needed
+            if (!game.getEngine().getMoves().isEmpty()) {
+                san = game.getEngine().getMoves().get(game.getEngine().getMoveCount() - 1);
+            }
 
-		gameMoveRepository.save(move);
+            // Update persistence
+            GameSession session = gameRepository.findById(gameId).orElseThrow(() -> new ResourceNotFoundException("GameSession not found"));
+            session.setCurrentFen(game.getEngine().getFen());
 
-		// Update game lastActivityAt
-		game.setLastActivityAt(Instant.now());
-		gameSessionRepository.save(game);
+            if (game.getState() == GameState.FINISHED) {
+                session.setGameState(GameState.FINISHED);
+                if (game.getResultOptional().isPresent()) {
+                    session.setResult(game.getResultOptional().get().name());
+                }
+                session.setResultReason(game.getResultReason());
+            }
 
-		log.debug("Move recorded: gameId={}, moveNumber={}, by={}", gameId, moveNumber, byPlayerId);
-	}
+            gameRepository.save(session);
 
-	/**
-	 * Finish a game with result and reason.
-	 */
-	@Transactional
-	public void finishGame(UUID gameId, String result, String resultReason) {
-		GameSession game = gameSessionRepository.findById(gameId)
-			.orElseThrow(() -> new ResourceNotFoundException("Game not found: " + gameId));
+            // Notify both players
+            webSocketNotifier.notifyMoveApplied(gameId, moveUci, san, movedColor, game.getEngine().getMoveCount(), game.getEngine().getFen(), game.getClock().getSnapshot());
 
-		game.setGameState(GameState.FINISHED);
-		game.setResult(result);
-		game.setResultReason(resultReason);
-		gameSessionRepository.save(game);
+            // If game ended, notify
+            if (game.getState() == GameState.FINISHED) {
+                webSocketNotifier.notifyGameEnded(gameId, game.getResultOptional().orElse(GameResult.DRAW), game.getResultReason(), game.getFinishedAt());
+            }
 
-		log.info("Game finished: gameId={}, result={}, reason={}", gameId, result, resultReason);
-	}
+            log.info("Move applied: gameId={}, moveUci={}, san={}", gameId, moveUci, san);
+        });
+    }
 
-	/**
-	 * Get a game by ID.
-	 */
-	@Transactional(readOnly = true)
-	public Optional<GameSession> getGame(UUID gameId) {
-		return gameSessionRepository.findById(gameId);
-	}
+    /**
+     * Resign a game.
+     */
+    @Transactional
+    public void resign(UUID gameId, long playerId) throws Exception {
+        gameRegistry.withWriteLock(gameId, game -> {
+            game.resign(playerId);
 
-	/**
-	 * Get all moves in a game in chronological order.
-	 */
-	@Transactional(readOnly = true)
-	public List<GameMove> getGameMoves(UUID gameId) {
-		return gameMoveRepository.findByGameIdOrderByMoveNumberAsc(gameId);
-	}
+            // Update persistence
+            GameSession session = gameRepository.findById(gameId).orElseThrow(() -> new ResourceNotFoundException("GameSession not found"));
+            session.setGameState(GameState.FINISHED);
+            if (game.getResultOptional().isPresent()) {
+                session.setResult(game.getResultOptional().get().name());
+            }
+            session.setResultReason(game.getResultReason());
+            gameRepository.save(session);
 
-	/**
-	 * Get active games for a player.
-	 */
-	@Transactional(readOnly = true)
-	public List<GameSession> getActiveGamesByPlayer(long playerId) {
-		return gameSessionRepository.findActiveGamesByPlayerId(playerId);
-	}
+            // Notify both players
+            GameResult result = game.getResultOptional().isPresent() ? game.getResultOptional().get() : GameResult.DRAW;
+            webSocketNotifier.notifyGameEnded(gameId, result, game.getResultReason(), game.getFinishedAt());
 
-	/**
-	 * Update current FEN position for a game (optional optimization for rapid lookup).
-	 */
-	@Transactional
-	public void updateFen(UUID gameId, String fen) {
-		GameSession game = gameSessionRepository.findById(gameId)
-			.orElseThrow(() -> new ResourceNotFoundException("Game not found: " + gameId));
+            log.info("Game resigned: gameId={}, playerId={}", gameId, playerId);
+        });
+    }
 
-		game.setCurrentFen(fen);
-		gameSessionRepository.save(game);
-	}
+    /**
+     * Accept a draw.
+     */
+    @Transactional
+    public void acceptDraw(UUID gameId) throws Exception {
+        gameRegistry.withWriteLock(gameId, game -> {
+            game.acceptDraw();
+
+            // Update persistence
+            GameSession session = gameRepository.findById(gameId).orElseThrow(() -> new ResourceNotFoundException("GameSession not found"));
+            session.setGameState(GameState.FINISHED);
+            if (game.getResultOptional().isPresent()) {
+                session.setResult(game.getResultOptional().get().name());
+            }
+            session.setResultReason(game.getResultReason());
+            gameRepository.save(session);
+
+            // Notify both players
+            GameResult result = game.getResultOptional().isPresent() ? game.getResultOptional().get() : GameResult.DRAW;
+            webSocketNotifier.notifyGameEnded(gameId, result, game.getResultReason(), game.getFinishedAt());
+
+            log.info("Draw accepted: gameId={}", gameId);
+        });
+    }
+
+    /**
+     * Get a game snapshot for the current state (for sync on reconnection).
+     */
+    public <T> T getGameSnapshot(UUID gameId, SnapshotHandler<T> handler) throws Exception {
+        return gameRegistry.withReadLock(gameId, handler::handle);
+    }
+
+    /**
+     * Functional interface for snapshot operations.
+     */
+    @FunctionalInterface
+    public interface SnapshotHandler<T> {
+        T handle(Game game);
+    }
 }
-

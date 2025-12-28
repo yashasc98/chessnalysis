@@ -10,12 +10,12 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class MatchmakingConfig {
 
-	/**
-	 * Create the in-memory matchmaking queue as a singleton bean.
-	 */
-	@Bean
-	public MatchmakingQueue matchmakingQueue() {
-		return new MatchmakingQueue();
-	}
+    /**
+     * Create the in-memory matchmaking queue as a singleton bean.
+     */
+    @Bean
+    public MatchmakingQueue matchmakingQueue() {
+        return new MatchmakingQueue();
+    }
 }
 
