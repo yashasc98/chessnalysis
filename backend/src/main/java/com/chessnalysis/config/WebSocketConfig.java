@@ -1,6 +1,7 @@
 package com.chessnalysis.config;
 
 import com.chessnalysis.websocket.interceptor.WebSocketAuthInterceptor;
+import com.chessnalysis.websocket.interceptor.WebSocketSecurityContextInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
@@ -19,6 +20,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final WebSocketAuthInterceptor webSocketAuthInterceptor;
+    private final WebSocketSecurityContextInterceptor webSocketSecurityContextInterceptor;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
@@ -33,12 +35,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws/game").setAllowedOrigins("*");
+        registry.addEndpoint("/ws/game").setAllowedOriginPatterns("*");
     }
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(webSocketAuthInterceptor);
+        registration.interceptors(webSocketAuthInterceptor, webSocketSecurityContextInterceptor);
     }
 }
 

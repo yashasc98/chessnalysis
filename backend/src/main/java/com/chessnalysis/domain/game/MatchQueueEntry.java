@@ -31,9 +31,6 @@ public class MatchQueueEntry {
     @Column(nullable = false)
     private Long userId;
 
-    @Column
-    private String deviceId;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TimeControl timeControl;

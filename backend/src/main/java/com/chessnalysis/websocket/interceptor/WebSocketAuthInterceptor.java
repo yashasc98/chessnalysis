@@ -4,6 +4,7 @@ import com.chessnalysis.dao.user.UserRepository;
 import com.chessnalysis.domain.user.User;
 import com.chessnalysis.security.CustomUserDetails;
 import com.chessnalysis.security.jwt.JwtProvider;
+import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.Message;
@@ -13,6 +14,7 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -33,7 +35,13 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
     private final UserRepository userRepository;
 
     @Override
-    public Message<?> preSend(Message<?> message, MessageChannel channel) {
+    @Nullable
+    public Message<?> preSend(@Nullable Message<?> message, @Nullable MessageChannel channel) {
+        if (message == null) {
+            return message;
+        }
+
+        log.info("WebSocketAuthInterceptor - preSend called with message: {} and messageChannel: {}", message, channel);
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
 
         // Only authenticate on CONNECT command
@@ -44,6 +52,8 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                 Long userId = jwtProvider.getUserIdFromToken(token);
                 String username = jwtProvider.getUsernameFromToken(token);
                 String role = jwtProvider.getRoleFromToken(token);
+
+                log.info("WebSocket auth -  userId: {}, username: {}, role: {}", userId, username, role);
 
                 User user = userRepository.findById(userId).orElse(null);
                 if (user == null) {
@@ -59,13 +69,23 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                         Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
                 );
 
+                // Set on accessor (WebSocket session state)
                 accessor.setUser(authentication);
+
+                // Store authentication in session attributes so it's available in all subsequent messages
+                accessor.getSessionAttributes().put("SPRING_SECURITY_CONTEXT", authentication);
+
+                // Also set SecurityContext for this thread
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                log.info("AUTHENTICATION USER SET ON ACCESSOR, SESSION ATTRIBUTES, AND SECURITY CONTEXT");
                 log.debug("WebSocket authenticated for user: {}", username);
             } else {
                 log.warn("WebSocket connection rejected: invalid or missing token");
                 return null;
             }
         }
+        // For non-CONNECT messages, WebSocketSecurityContextInterceptor handles restoration
 
         return message;
     }

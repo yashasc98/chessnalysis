@@ -39,7 +39,7 @@ public class MatchmakingService {
      * Prevents duplicate entries from same user (regardless of device).
      */
     @Transactional
-    public UUID enterQueue(long userId, String deviceId, TimeControl timeControl) {
+    public UUID enterQueue(long userId, TimeControl timeControl) {
         // Check for duplicate queued entry by user id
         List<MatchQueueEntry> existingEntries = matchQueueEntryRepository.findQueuedEntriesByUser(userId);
         if (!existingEntries.isEmpty()) {
@@ -48,7 +48,7 @@ public class MatchmakingService {
         }
 
         // Add to in-memory queue
-        boolean enqueued = matchmakingQueue.enqueue(userId, deviceId, timeControl);
+        boolean enqueued = matchmakingQueue.enqueue(userId, timeControl);
         if (!enqueued) {
             throw new IllegalStateException("Failed to enqueue player");
         }
@@ -58,24 +58,15 @@ public class MatchmakingService {
         MatchQueueEntry entry = MatchQueueEntry.builder()
                 .queueId(queueId)
                 .userId(userId)
-                .deviceId(deviceId)
                 .timeControl(timeControl)
                 .status(MatchQueueEntry.QueueStatus.QUEUED)
                 .build();
 
         matchQueueEntryRepository.save(entry);
-        log.info("Player entered queue: userId={}, deviceId={}, timeControl={}, queueId={}",
-                userId, deviceId, timeControl, queueId);
+        log.info("Player entered queue: userId={}, timeControl={}, queueId={}",
+                userId, timeControl, queueId);
 
         return queueId;
-    }
-
-    /**
-     * Convenience overload for enqueueing only by userId and timeControl (no deviceId required).
-     */
-    @Transactional
-    public UUID enterQueue(long userId, TimeControl timeControl) {
-        return enterQueue(userId, null, timeControl);
     }
 
     /**

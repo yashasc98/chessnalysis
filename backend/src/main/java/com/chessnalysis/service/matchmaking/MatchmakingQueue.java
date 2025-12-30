@@ -22,13 +22,14 @@ public class MatchmakingQueue {
         // Initialize queues for all time controls
         Arrays.stream(TimeControl.values())
                 .forEach(tc -> queues.put(tc, new ConcurrentLinkedQueue<>()));
+        log.info("MatchmakingQueue initialized with {} time controls", queues.size());
     }
 
     /**
      * Add a player to the queue for a specific time control.
      * Prevents duplicate queue entries for the same user (regardless of device).
      */
-    public boolean enqueue(long userId, String deviceId, TimeControl timeControl) {
+    public boolean enqueue(long userId, TimeControl timeControl) {
         Queue<QueuedPlayer> queue = queues.get(timeControl);
         if (queue == null) {
             log.warn("Time control {} not found", timeControl);
@@ -44,7 +45,7 @@ public class MatchmakingQueue {
             return false;
         }
 
-        QueuedPlayer player = new QueuedPlayer(userId, deviceId, timeControl, Instant.now());
+        QueuedPlayer player = new QueuedPlayer(userId, timeControl, Instant.now());
         queue.offer(player);
         log.debug("Player enqueued: userId={}, timeControl={}, queueSize={}", userId, timeControl, queue.size());
         return true;
@@ -96,7 +97,16 @@ public class MatchmakingQueue {
      */
     public int getQueueSize(TimeControl timeControl) {
         Queue<QueuedPlayer> queue = queues.get(timeControl);
-        return queue != null ? queue.size() : 0;
+        int size = queue != null ? queue.size() : 0;
+
+        // Log all non-empty queues for debugging
+        queues.forEach((tc, q) -> {
+            if (!q.isEmpty()) {
+                log.debug("Non-empty queue: timeControl={}, size={}", tc, q.size());
+            }
+        });
+
+        return size;
     }
 
     /**
@@ -135,7 +145,6 @@ public class MatchmakingQueue {
      */
     public record QueuedPlayer(
             long userId,
-            String deviceId,
             TimeControl timeControl,
             Instant queuedAt
     ) {

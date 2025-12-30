@@ -4,11 +4,12 @@ import com.chessnalysis.dto.matchmaking.EnterQueueRequest;
 import com.chessnalysis.dto.matchmaking.LeaveQueueRequest;
 import com.chessnalysis.security.CustomUserDetails;
 import com.chessnalysis.service.matchmaking.MatchmakingService;
+import com.chessnalysis.websocket.context.WebSocketAuthenticationContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Controller;
 
 import java.util.UUID;
@@ -30,13 +31,24 @@ public class MatchmakingWebSocketController {
      * Client receives response via /user/queue/match-found when match is created.
      */
     @MessageMapping("/matchmaking/enter")
-    public void handleEnterQueue(@Payload EnterQueueRequest request, @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public void handleEnterQueue(@Payload EnterQueueRequest request) {
         try {
+            // Extract authentication from custom WebSocket context (reliable across thread boundaries)
+            UsernamePasswordAuthenticationToken auth = WebSocketAuthenticationContext.getAuthentication();
+            if (auth == null || !(auth.getPrincipal() instanceof CustomUserDetails userDetails)) {
+                log.error("Authentication not found in WebSocketAuthenticationContext or principal is not CustomUserDetails");
+                return;
+            }
+
+            log.info("Player is trying to enter queue via WebSocket: userId={}, timeControl={}",
+                     userDetails.userId(), request.timeControl());
+
             var queueId = matchmakingService.enterQueue(userDetails.userId(), request.timeControl());
 
             var position = matchmakingService.getQueuePosition(userDetails.userId(), request.timeControl()).orElse(-1);
 
-            log.info("Player entered queue via WebSocket: userId={}, queueId={}, position={}, timeControl={}", userDetails.userId(), queueId, position, request.timeControl());
+            log.info("Player entered queue via WebSocket: userId={}, queueId={}, position={}, timeControl={}",
+                     userDetails.userId(), queueId, position, request.timeControl());
         } catch (Exception e) {
             log.error("Error entering queue: ", e);
         }
@@ -47,8 +59,17 @@ public class MatchmakingWebSocketController {
      * Message destination: /app/matchmaking/leave
      */
     @MessageMapping("/matchmaking/leave")
-    public void handleLeaveQueue(@Payload LeaveQueueRequest request, @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public void handleLeaveQueue(@Payload LeaveQueueRequest request) {
         try {
+            // Extract authentication from custom WebSocket context (reliable across thread boundaries)
+            UsernamePasswordAuthenticationToken auth = WebSocketAuthenticationContext.getAuthentication();
+            if (auth == null || !(auth.getPrincipal() instanceof CustomUserDetails userDetails)) {
+                log.error("Authentication not found in WebSocketAuthenticationContext or principal is not CustomUserDetails");
+                return;
+            }
+
+            log.info("Player is trying to leave queue via WebSocket: userId={}", userDetails.userId());
+
             UUID queueId = request.queueId();
             boolean removed;
 
@@ -63,7 +84,7 @@ public class MatchmakingWebSocketController {
             }
 
             if (removed) {
-                log.info("Player left queue via WebSocket: userId={}, queueId={}", userDetails.userId(), queueId);
+                log.info("Player successfully left queue via WebSocket: userId={}, queueId={}", userDetails.userId(), queueId);
             } else {
                 log.warn("Player not found or failed to remove queue entry: userId={}, queueId={}", userDetails.userId(), queueId);
             }
