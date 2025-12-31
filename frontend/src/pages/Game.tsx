@@ -63,7 +63,6 @@ export default function Game() {
   const [moveHistory, setMoveHistory] = useState<string[]>([])
   const subscriptionsRef = useRef<any[]>([])
 
-  // Setup subscriptions and sync on mount
   useEffect(() => {
     if (!gameId || !user) return
 
@@ -71,7 +70,6 @@ export default function Game() {
       try {
         await stompClient.waitForConnection()
 
-        // Subscribe to game topic for all players
         const gameTopic = `/topic/game.${gameId}`
         const gameSub = stompClient.subscribe(gameTopic, (msg) => {
           const payload = JSON.parse(msg.body)
@@ -79,7 +77,6 @@ export default function Game() {
         })
         subscriptionsRef.current.push(gameSub)
 
-        // Subscribe to personal game-sync queue for reconnection
         const syncSub = stompClient.subscribe('/user/queue/game-sync', (msg) => {
           const payload: GameStateSyncEvent = JSON.parse(msg.body)
           if (payload.gameId === gameId) {
@@ -88,17 +85,13 @@ export default function Game() {
         })
         subscriptionsRef.current.push(syncSub)
 
-        // Subscribe to error queue
         const errorSub = stompClient.subscribe('/user/queue/errors', (msg) => {
           const payload = JSON.parse(msg.body)
           setGameState((s) => ({ ...s, lastError: payload.message }))
         })
         subscriptionsRef.current.push(errorSub)
 
-        // Request sync from server (in case we're reconnecting)
         await stompClient.send(`/app/game/${gameId}/sync`, {})
-
-        // Set initial status to PENDING (waiting for opponent or game start)
         setGameState((s) => ({ ...s, status: 'PENDING' }))
       } catch (e) {
         console.error('Failed to setup game:', e)
@@ -109,16 +102,11 @@ export default function Game() {
     setupGame()
 
     return () => {
-      subscriptionsRef.current.forEach((sub) => {
-        if (sub && typeof sub.unsubscribe === 'function') {
-          sub.unsubscribe()
-        }
-      })
+      subscriptionsRef.current.forEach((sub) => sub?.unsubscribe?.())
       subscriptionsRef.current = []
     }
   }, [gameId, user])
 
-  // Determine if it's my turn
   useEffect(() => {
     if (!user || !gameState.myColor || gameState.status !== 'ACTIVE') {
       setIsMyTurn(false)
@@ -130,8 +118,6 @@ export default function Game() {
   }, [gameState.currentTurn, gameState.myColor, gameState.status, user])
 
   function handleGameEvent(payload: any) {
-    console.log('🎮 Game event received:', JSON.stringify(payload, null, 2))
-    // Determine event type by checking which fields are present
     if ((payload as GameStartedEvent).whitePlayerId !== undefined) {
       const event = payload as GameStartedEvent
       setGameState((s) => ({
@@ -140,12 +126,9 @@ export default function Game() {
         whitePlayerId: event.whitePlayerId,
         blackPlayerId: event.blackPlayerId
       }))
-      console.log('Game started:', event)
     } else if ((payload as IllegalMoveEvent).reason !== undefined) {
-      // Check for IllegalMoveEvent BEFORE MoveAppliedEvent since both have moveUci
       const event = payload as IllegalMoveEvent
       setGameState((s) => ({ ...s, lastError: `Illegal move: ${event.reason}` }))
-      // Revert the board to the last valid FEN
       chessRef.current.undo()
     } else if ((payload as MoveAppliedEvent).moveUci !== undefined) {
       applyMoveEvent(payload as MoveAppliedEvent)
@@ -162,9 +145,8 @@ export default function Game() {
 
   function applyMoveEvent(event: MoveAppliedEvent) {
     try {
-      console.log('📍 Applying move event:', { moveUci: event.moveUci, fen: event.fen, san: event.sanNotation })
       if (!event.fen) {
-        console.error('❌ MoveAppliedEvent missing FEN field:', event)
+        console.error('MoveAppliedEvent missing FEN field:', event)
         return
       }
       chessRef.current.load(event.fen)
@@ -174,7 +156,6 @@ export default function Game() {
         currentTurn: chessRef.current.turn()
       }))
       setMoveHistory((prev) => [...prev, event.sanNotation])
-      console.log('✅ Move applied successfully:', event.sanNotation)
     } catch (e) {
       console.error('Failed to load FEN from move event:', e)
       setGameState((s) => ({ ...s, lastError: 'Failed to apply move' }))
@@ -190,7 +171,6 @@ export default function Game() {
         currentTurn: chessRef.current.turn(),
         status: event.state as 'PENDING' | 'ACTIVE' | 'ENDED'
       }))
-      console.log('Game synced from server:', event)
     } catch (e) {
       console.error('Failed to load FEN from sync event:', e)
     }
@@ -200,7 +180,6 @@ export default function Game() {
     if (!gameId) return
     try {
       await stompClient.send(`/app/game/${gameId}/start`, {})
-      console.log('Start game signal sent')
     } catch (e) {
       console.error('Failed to start game:', e)
       setGameState((s) => ({ ...s, lastError: 'Failed to start game' }))
@@ -210,16 +189,13 @@ export default function Game() {
   function onPieceDrop(args: any): boolean {
     const { sourceSquare, targetSquare } = args
 
-    // Can't move if not my turn or game not active
     if (!isMyTurn || gameState.status !== 'ACTIVE') {
-      console.warn('Not your turn or game not active')
       return false
     }
 
     if (!sourceSquare || !targetSquare) return false
 
     try {
-      // Attempt move with standard promotion to queen (can be enhanced)
       const move = chessRef.current.move({
         from: sourceSquare,
         to: targetSquare,
@@ -227,18 +203,15 @@ export default function Game() {
       })
 
       if (!move) {
-        console.warn('Illegal move:', sourceSquare, targetSquare)
         return false
       }
 
-      // Update local board state optimistically
       setGameState((s) => ({
         ...s,
         fen: chessRef.current.fen(),
         currentTurn: chessRef.current.turn()
       }))
 
-      // Send move to backend (format: source + target + optional promotion)
       const moveUci = sourceSquare + targetSquare + (move.promotion ? move.promotion : '')
       sendMove(moveUci)
 
@@ -252,11 +225,8 @@ export default function Game() {
   async function sendMove(moveUci: string) {
     if (!gameId) return
     try {
-      console.log(`Sending move: ${moveUci}`)
       await stompClient.send(`/app/game/${gameId}/move`, { moveUci })
     } catch (e) {
-      console.error('Failed to send move:', e)
-      // Undo the move optimistically applied
       chessRef.current.undo()
       setGameState((s) => ({
         ...s,
@@ -271,7 +241,6 @@ export default function Game() {
     if (!gameId) return
     try {
       await stompClient.send(`/app/game/${gameId}/resign`, {})
-      console.log('Resignation sent')
     } catch (e) {
       console.error('Failed to resign:', e)
       setGameState((s) => ({ ...s, lastError: 'Failed to resign' }))
@@ -286,155 +255,104 @@ export default function Game() {
   }
 
   return (
-    <div style={styles.container}>
-      <h2>Game {gameId}</h2>
+    <div className="page-shell game-page">
+      <header className="page-header">
+        <div>
+          <div className="eyebrow">Game {gameId}</div>
+          <h2>Head to head</h2>
+          <p className="lede">Moves sync instantly. Keep this tab open while you play.</p>
+        </div>
+        <button className="btn ghost" onClick={() => navigate('/lobby')}>Back to lobby</button>
+      </header>
 
-      {/* Game Status Section */}
-      <div style={styles.statusSection}>
-        <div style={styles.playerInfo}>
-          <strong>You:</strong> {user?.username} ({gameState.myColor?.toUpperCase()})
-        </div>
-        <div style={styles.playerInfo}>
-          <strong>Opponent:</strong> {getOpponentInfo()}
-        </div>
-        <div style={styles.status}>
-          <strong>Status:</strong> {gameState.status}
-        </div>
-        {gameState.status === 'ACTIVE' && (
-          <div style={styles.turnIndicator}>
-            <strong>Current Turn:</strong> {gameState.currentTurn === 'w' ? 'White' : 'Black'}
-            {isMyTurn && <span style={styles.myTurn}> (Your Turn!)</span>}
+      {gameState.lastError && <div className="alert error">{gameState.lastError}</div>}
+
+      <div className="game-layout">
+        <section className="board-panel">
+          <div className="player-row top">
+            <div>
+              <div className="label">Opponent</div>
+              <div className="player-name">{getOpponentInfo()}</div>
+            </div>
+            <div className="badge subtle">{gameState.currentTurn === 'b' ? 'To move' : 'Waiting'}</div>
           </div>
-        )}
-        {gameState.status === 'ENDED' && (
-          <div style={styles.result}>
-            <strong>Result:</strong> {gameState.result} - {gameState.resultReason}
+
+          <div className="board-shell">
+            <Chessboard
+              options={{
+                position: gameState.fen,
+                onPieceDrop,
+                boardOrientation: gameState.myColor === 'black' ? 'black' : 'white'
+              }}
+            />
           </div>
-        )}
-      </div>
 
-      {/* Error Message */}
-      {gameState.lastError && (
-        <div style={styles.error}>{gameState.lastError}</div>
-      )}
+          <div className="player-row bottom">
+            <div>
+              <div className="label">You</div>
+              <div className="player-name">{user?.username} ({gameState.myColor?.toUpperCase()})</div>
+            </div>
+            {isMyTurn && <div className="badge live">Your turn</div>}
+            {!isMyTurn && gameState.status === 'ACTIVE' && <div className="badge subtle">Opponent to move</div>}
+          </div>
+        </section>
 
-      {/* Move History */}
-      {moveHistory.length > 0 && (
-        <div style={styles.moveHistory}>
-          <strong>Moves:</strong> {moveHistory.join(', ')}
-        </div>
-      )}
+        <aside className="info-panel">
+          <div className="panel">
+            <div className="panel-head">
+              <div className="eyebrow">Status</div>
+              <div className="badge subtle">{gameState.status}</div>
+            </div>
+            <div className="info-list">
+              <div className="info-line">
+                <span className="label">Current turn</span>
+                <span>{gameState.currentTurn === 'w' ? 'White' : 'Black'}</span>
+              </div>
+              <div className="info-line">
+                <span className="label">White ID</span>
+                <span>{gameState.whitePlayerId ?? '—'}</span>
+              </div>
+              <div className="info-line">
+                <span className="label">Black ID</span>
+                <span>{gameState.blackPlayerId ?? '—'}</span>
+              </div>
+              {gameState.status === 'ENDED' && (
+                <div className="info-line">
+                  <span className="label">Result</span>
+                  <span>{gameState.result} · {gameState.resultReason}</span>
+                </div>
+              )}
+            </div>
 
-      {/* Chessboard */}
-      <div style={styles.boardContainer}>
-        <Chessboard
-          options={{
-            position: gameState.fen,
-            onPieceDrop,
-            boardOrientation: gameState.myColor === 'black' ? 'black' : 'white'
-          }}
-        />
-      </div>
+            <div className="button-stack">
+              {gameState.status === 'PENDING' && (
+                <button className="btn primary" onClick={handleStartGame}>Start game</button>
+              )}
+              {gameState.status === 'ACTIVE' && (
+                <button className="btn ghost" onClick={handleResign}>Resign</button>
+              )}
+            </div>
+          </div>
 
-      {/* Game Controls */}
-      <div style={styles.controls}>
-        {gameState.status === 'PENDING' && (
-          <button onClick={handleStartGame} style={styles.button}>
-            Start Game
-          </button>
-        )}
-        {gameState.status === 'ACTIVE' && (
-          <button onClick={handleResign} style={styles.button}>
-            Resign
-          </button>
-        )}
-        <button onClick={() => navigate('/lobby')} style={styles.button}>
-          Back to Lobby
-        </button>
+          <div className="panel">
+            <div className="panel-head">
+              <div className="eyebrow">Moves</div>
+              <div className="microcopy">SAN list</div>
+            </div>
+            {moveHistory.length === 0 ? (
+              <div className="empty">No moves yet.</div>
+            ) : (
+              <ol className="moves-list">
+                {moveHistory.map((move, idx) => (
+                  <li key={`${move}-${idx}`}>{move}</li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </aside>
       </div>
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    padding: '20px',
-    maxWidth: '800px',
-    margin: '0 auto',
-    color: '#e0e0e0'
-  },
-  statusSection: {
-    marginBottom: '20px',
-    padding: '10px',
-    backgroundColor: '#2a2a2a',
-    borderRadius: '5px',
-    color: '#e0e0e0'
-  },
-  playerInfo: {
-    margin: '5px 0',
-    fontSize: '14px',
-    color: '#e0e0e0'
-  },
-  status: {
-    margin: '5px 0',
-    fontSize: '14px',
-    fontWeight: 'bold',
-    color: '#e0e0e0'
-  },
-  turnIndicator: {
-    margin: '10px 0',
-    padding: '5px',
-    backgroundColor: '#1e3a5f',
-    borderRadius: '3px',
-    fontSize: '14px',
-    color: '#e0e0e0'
-  },
-  myTurn: {
-    color: '#64b5f6',
-    fontWeight: 'bold'
-  },
-  result: {
-    margin: '10px 0',
-    padding: '10px',
-    backgroundColor: '#2d4a2d',
-    borderRadius: '3px',
-    fontSize: '14px',
-    color: '#81c784'
-  },
-  moveHistory: {
-    marginBottom: '20px',
-    padding: '10px',
-    backgroundColor: '#3a3a2a',
-    borderRadius: '5px',
-    fontSize: '14px',
-    color: '#e0e0e0'
-  },
-  error: {
-    marginBottom: '20px',
-    padding: '10px',
-    backgroundColor: '#4a2a2a',
-    color: '#ef5350',
-    borderRadius: '5px',
-    fontSize: '14px'
-  },
-  boardContainer: {
-    marginBottom: '20px',
-    width: '500px',
-    height: '500px'
-  },
-  controls: {
-    display: 'flex',
-    gap: '10px'
-  },
-  button: {
-    padding: '10px 20px',
-    backgroundColor: '#1976d2',
-    color: 'white',
-    border: 'none',
-    borderRadius: '5px',
-    cursor: 'pointer',
-    fontSize: '14px'
-  }
 }
 
 
