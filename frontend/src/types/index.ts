@@ -18,9 +18,50 @@ export type EnterQueueRequest = { timeControl: string }
 export type LeaveQueueRequest = { queueId?: string }
 
 // Game WS DTOs (incoming events)
-export type MatchFoundEvent = { gameId: string; opponentId: number; opponentName: string; color: string; timeControl: any }
-export type MoveAppliedEvent = { gameId: string; moveUci: string; sanNotation: string; byColor: string; moveNumber: number; fen: string; clock: any }
-export type GameStateSyncEvent = { gameId: string; state: string; fen: string; moveCount: number; clock: any; result?: any; resultReason?: string }
-export type IllegalMoveEvent = { gameId: string; moveUci: string; reason: string }
-export type GameStartedEvent = { gameId: string; whitePlayerId: number; blackPlayerId: number; timeControl: string }
-export type GameEndedEvent = { gameId: string; result: string; reason: string; finishedAt: string }
+export type MatchFoundEvent = { 
+  gameId: string
+  opponentId: number
+  opponentUsername: string
+  color: string
+  timeControl: any 
+}
+
+export type GameStartedEvent = { 
+  gameId: string
+  whitePlayerId: number
+  blackPlayerId: number
+  timeControl: string 
+}
+
+export type MoveAppliedEvent = { 
+  gameId: string
+  moveUci: string
+  sanNotation: string
+  byColor: string
+  moveNumber: number
+  fen: string
+  clock: any 
+}
+
+export type GameStateSyncEvent = { 
+  gameId: string
+  state: string
+  fen: string
+  moveCount: number
+  clock: any
+  result?: any
+  resultReason?: string 
+}
+
+export type IllegalMoveEvent = { 
+  gameId: string
+  moveUci: string
+  reason: string 
+}
+
+export type GameEndedEvent = { 
+  gameId: string
+  result: string
+  reason: string
+  finishedAt: string 
+}

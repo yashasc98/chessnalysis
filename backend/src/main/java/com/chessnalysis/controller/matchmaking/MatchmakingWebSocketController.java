@@ -4,14 +4,16 @@ import com.chessnalysis.dto.matchmaking.EnterQueueRequest;
 import com.chessnalysis.dto.matchmaking.LeaveQueueRequest;
 import com.chessnalysis.security.CustomUserDetails;
 import com.chessnalysis.service.matchmaking.MatchmakingService;
-import com.chessnalysis.websocket.context.WebSocketAuthenticationContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Controller;
 
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -31,12 +33,15 @@ public class MatchmakingWebSocketController {
      * Client receives response via /user/queue/match-found when match is created.
      */
     @MessageMapping("/matchmaking/enter")
-    public void handleEnterQueue(@Payload EnterQueueRequest request) {
+    public void handleEnterQueue(@Payload EnterQueueRequest request, Message<?> message) {
         try {
-            // Extract authentication from custom WebSocket context (reliable across thread boundaries)
-            UsernamePasswordAuthenticationToken auth = WebSocketAuthenticationContext.getAuthentication();
+            // Extract principal from WebSocket session attributes
+            StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+            Map<String, Object> sessionAttrs = accessor.getSessionAttributes();
+            
+            UsernamePasswordAuthenticationToken auth = (UsernamePasswordAuthenticationToken) sessionAttrs.get("SPRING_SECURITY_CONTEXT");
             if (auth == null || !(auth.getPrincipal() instanceof CustomUserDetails userDetails)) {
-                log.error("Authentication not found in WebSocketAuthenticationContext or principal is not CustomUserDetails");
+                log.error("Authentication not found in session attributes or principal is not CustomUserDetails");
                 return;
             }
 
@@ -59,12 +64,15 @@ public class MatchmakingWebSocketController {
      * Message destination: /app/matchmaking/leave
      */
     @MessageMapping("/matchmaking/leave")
-    public void handleLeaveQueue(@Payload LeaveQueueRequest request) {
+    public void handleLeaveQueue(@Payload LeaveQueueRequest request, Message<?> message) {
         try {
-            // Extract authentication from custom WebSocket context (reliable across thread boundaries)
-            UsernamePasswordAuthenticationToken auth = WebSocketAuthenticationContext.getAuthentication();
+            // Extract principal from WebSocket session attributes
+            StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+            Map<String, Object> sessionAttrs = accessor.getSessionAttributes();
+            
+            UsernamePasswordAuthenticationToken auth = (UsernamePasswordAuthenticationToken) sessionAttrs.get("SPRING_SECURITY_CONTEXT");
             if (auth == null || !(auth.getPrincipal() instanceof CustomUserDetails userDetails)) {
-                log.error("Authentication not found in WebSocketAuthenticationContext or principal is not CustomUserDetails");
+                log.error("Authentication not found in session attributes or principal is not CustomUserDetails");
                 return;
             }
 

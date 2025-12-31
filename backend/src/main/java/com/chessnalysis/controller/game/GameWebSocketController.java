@@ -8,12 +8,15 @@ import com.chessnalysis.service.game.GameService;
 import com.chessnalysis.websocket.notifier.WebSocketNotifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.Message;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Controller;
 
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -35,8 +38,16 @@ public class GameWebSocketController {
      * Validates the move and applies it if legal.
      */
     @MessageMapping("/game/{gameId}/move")
-    public void handleMove(@DestinationVariable String gameId, @Payload MoveRequest request, @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public void handleMove(@DestinationVariable String gameId, @Payload MoveRequest request, Message<?> message) {
         try {
+            StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+            Map<String, Object> sessionAttrs = accessor.getSessionAttributes();
+            UsernamePasswordAuthenticationToken auth = (UsernamePasswordAuthenticationToken) sessionAttrs.get("SPRING_SECURITY_CONTEXT");
+            if (auth == null || !(auth.getPrincipal() instanceof CustomUserDetails userDetails)) {
+                log.error("Authentication not found in session attributes");
+                return;
+            }
+            
             UUID gameUuid = UUID.fromString(gameId);
             log.debug("Move received: gameId={}, playerId={}, moveUci={}", gameId, userDetails.userId(), request.moveUci());
 
@@ -44,10 +55,8 @@ public class GameWebSocketController {
             log.info("Move successfully applied: gameId={}, moveUci={}", gameId, request.moveUci());
         } catch (IllegalArgumentException e) {
             log.warn("Invalid game ID format: {}", gameId);
-            webSocketNotifier.notifyError(userDetails.userId(), "Invalid game ID");
         } catch (Exception e) {
-            log.error("Error applying move: gameId={}, playerId={}, error={}", gameId, userDetails.userId(), e.getMessage(), e);
-            webSocketNotifier.notifyError(userDetails.userId(), "Failed to apply move: " + e.getMessage());
+            log.error("Error applying move: gameId={}, error={}", gameId, e.getMessage(), e);
         }
     }
 
@@ -56,8 +65,16 @@ public class GameWebSocketController {
      * Message destination: /app/game/{gameId}/resign
      */
     @MessageMapping("/game/{gameId}/resign")
-    public void handleResign(@DestinationVariable String gameId, @Payload ResignRequest request, @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public void handleResign(@DestinationVariable String gameId, @Payload ResignRequest request, Message<?> message) {
         try {
+            StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+            Map<String, Object> sessionAttrs = accessor.getSessionAttributes();
+            UsernamePasswordAuthenticationToken auth = (UsernamePasswordAuthenticationToken) sessionAttrs.get("SPRING_SECURITY_CONTEXT");
+            if (auth == null || !(auth.getPrincipal() instanceof CustomUserDetails userDetails)) {
+                log.error("Authentication not found in session attributes");
+                return;
+            }
+            
             UUID gameUuid = UUID.fromString(gameId);
             log.debug("Resign received: gameId={}, playerId={}", gameId, userDetails.userId());
 
@@ -65,10 +82,8 @@ public class GameWebSocketController {
             log.info("Game resigned: gameId={}, playerId={}", gameId, userDetails.userId());
         } catch (IllegalArgumentException e) {
             log.warn("Invalid game ID format: {}", gameId);
-            webSocketNotifier.notifyError(userDetails.userId(), "Invalid game ID");
         } catch (Exception e) {
-            log.error("Error resigning game: gameId={}, playerId={}, error={}", gameId, userDetails.userId(), e.getMessage(), e);
-            webSocketNotifier.notifyError(userDetails.userId(), "Failed to resign: " + e.getMessage());
+            log.error("Error resigning game: gameId={}, error={}", gameId, e.getMessage(), e);
         }
     }
 
@@ -77,8 +92,16 @@ public class GameWebSocketController {
      * Message destination: /app/game/{gameId}/draw
      */
     @MessageMapping("/game/{gameId}/draw")
-    public void handleDraw(@DestinationVariable String gameId, @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public void handleDraw(@DestinationVariable String gameId, Message<?> message) {
         try {
+            StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+            Map<String, Object> sessionAttrs = accessor.getSessionAttributes();
+            UsernamePasswordAuthenticationToken auth = (UsernamePasswordAuthenticationToken) sessionAttrs.get("SPRING_SECURITY_CONTEXT");
+            if (auth == null || !(auth.getPrincipal() instanceof CustomUserDetails userDetails)) {
+                log.error("Authentication not found in session attributes");
+                return;
+            }
+            
             UUID gameUuid = UUID.fromString(gameId);
             log.debug("Draw accepted: gameId={}, playerId={}", gameId, userDetails.userId());
 
@@ -86,10 +109,8 @@ public class GameWebSocketController {
             log.info("Draw accepted: gameId={}", gameId);
         } catch (IllegalArgumentException e) {
             log.warn("Invalid game ID format: {}", gameId);
-            webSocketNotifier.notifyError(userDetails.userId(), "Invalid game ID");
         } catch (Exception e) {
-            log.error("Error accepting draw: gameId={}, playerId={}, error={}", gameId, userDetails.userId(), e.getMessage(), e);
-            webSocketNotifier.notifyError(userDetails.userId(), "Failed to accept draw: " + e.getMessage());
+            log.error("Error accepting draw: gameId={}, error={}", gameId, e.getMessage(), e);
         }
     }
 
@@ -99,8 +120,16 @@ public class GameWebSocketController {
      * Sends full game state to the requesting player.
      */
     @MessageMapping("/game/{gameId}/sync")
-    public void handleSync(@DestinationVariable String gameId, @Payload GameSyncRequest request, @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public void handleSync(@DestinationVariable String gameId, @Payload GameSyncRequest request, Message<?> message) {
         try {
+            StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+            Map<String, Object> sessionAttrs = accessor.getSessionAttributes();
+            UsernamePasswordAuthenticationToken auth = (UsernamePasswordAuthenticationToken) sessionAttrs.get("SPRING_SECURITY_CONTEXT");
+            if (auth == null || !(auth.getPrincipal() instanceof CustomUserDetails userDetails)) {
+                log.error("Authentication not found in session attributes");
+                return;
+            }
+            
             UUID gameUuid = UUID.fromString(gameId);
             log.debug("Sync requested: gameId={}, playerId={}", gameId, userDetails.userId());
 
@@ -113,10 +142,8 @@ public class GameWebSocketController {
             log.info("Game sync sent: gameId={}, playerId={}", gameId, userDetails.userId());
         } catch (IllegalArgumentException e) {
             log.warn("Invalid game ID format: {}", gameId);
-            webSocketNotifier.notifyError(userDetails.userId(), "Invalid game ID");
         } catch (Exception e) {
-            log.error("Error syncing game: gameId={}, playerId={}, error={}", gameId, userDetails.userId(), e.getMessage(), e);
-            webSocketNotifier.notifyError(userDetails.userId(), "Failed to sync: " + e.getMessage());
+            log.error("Error syncing game: gameId={}, error={}", gameId, e.getMessage(), e);
         }
     }
 
@@ -126,8 +153,16 @@ public class GameWebSocketController {
      * Transitions game from PENDING to ACTIVE.
      */
     @MessageMapping("/game/{gameId}/start")
-    public void handleStart(@DestinationVariable String gameId, @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public void handleStart(@DestinationVariable String gameId, Message<?> message) {
         try {
+            StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+            Map<String, Object> sessionAttrs = accessor.getSessionAttributes();
+            UsernamePasswordAuthenticationToken auth = (UsernamePasswordAuthenticationToken) sessionAttrs.get("SPRING_SECURITY_CONTEXT");
+            if (auth == null || !(auth.getPrincipal() instanceof CustomUserDetails userDetails)) {
+                log.error("Authentication not found in session attributes");
+                return;
+            }
+            
             UUID gameUuid = UUID.fromString(gameId);
             log.debug("Start game requested: gameId={}, playerId={}", gameId, userDetails.userId());
 
@@ -135,10 +170,8 @@ public class GameWebSocketController {
             log.info("Game started: gameId={}", gameId);
         } catch (IllegalArgumentException e) {
             log.warn("Invalid game ID format: {}", gameId);
-            webSocketNotifier.notifyError(userDetails.userId(), "Invalid game ID");
         } catch (Exception e) {
-            log.error("Error starting game: gameId={}, playerId={}, error={}", gameId, userDetails.userId(), e.getMessage(), e);
-            webSocketNotifier.notifyError(userDetails.userId(), "Failed to start game: " + e.getMessage());
+            log.error("Error starting game: gameId={}, error={}", gameId, e.getMessage(), e);
         }
     }
 }

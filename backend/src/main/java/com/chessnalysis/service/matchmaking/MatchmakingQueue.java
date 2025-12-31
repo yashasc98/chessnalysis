@@ -73,7 +73,11 @@ public class MatchmakingQueue {
      */
     public Optional<Pair> popPair(TimeControl timeControl) {
         Queue<QueuedPlayer> queue = queues.get(timeControl);
+        int queueSize = queue != null ? queue.size() : 0;
+        log.info("popPair called: timeControl={}, queueSize={}", timeControl, queueSize);
+        
         if (queue == null || queue.size() < 2) {
+            log.debug("Queue too small for pair: timeControl={}, size={}", timeControl, queueSize);
             return Optional.empty();
         }
 
@@ -81,14 +85,16 @@ public class MatchmakingQueue {
         QueuedPlayer second = queue.poll();
 
         if (first != null && second != null) {
-            log.debug("Pair created: userId1={}, userId2={}, timeControl={}", first.userId(), second.userId(), timeControl);
+            log.info("Pair created successfully: user1={}, user2={}, timeControl={}", 
+                     first.userId(), second.userId(), timeControl);
             return Optional.of(new Pair(first, second));
         }
 
         // Put them back if something went wrong
         if (first != null) queue.offer(first);
         if (second != null) queue.offer(second);
-
+        
+        log.warn("Pair creation failed: first={}, second={}", first, second);
         return Optional.empty();
     }
 

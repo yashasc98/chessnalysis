@@ -29,7 +29,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         taskScheduler.setThreadNamePrefix("wss-heartbeat-");
         taskScheduler.initialize();
 
-        config.enableSimpleBroker("/topic").setHeartbeatValue(new long[]{25000, 25000}).setTaskScheduler(taskScheduler);
+        config.enableSimpleBroker("/topic", "/queue")
+            .setHeartbeatValue(new long[]{25000, 25000})
+            .setTaskScheduler(taskScheduler);
+
         config.setApplicationDestinationPrefixes("/app");
     }
 

@@ -27,10 +27,12 @@ public class GameClock {
 
     /**
      * Create a clock for the given time control.
+     * Note: TimeControl values are in MINUTES (standard chess notation),
+     * so we multiply by 60 to convert to seconds, then by 1000 for milliseconds.
      */
     public GameClock(TimeControl timeControl) {
         this.timeControl = timeControl;
-        long baseMs = (long) timeControl.getBaseSeconds() * 1000;
+        long baseMs = (long) timeControl.getBaseSeconds() * 60 * 1000;
         this.whiteRemainingMs = new AtomicLong(baseMs);
         this.blackRemainingMs = new AtomicLong(baseMs);
         this.incrementMs = timeControl.getIncrementSeconds() * 1000;
@@ -40,13 +42,19 @@ public class GameClock {
 
     /**
      * Get the remaining time for a player in milliseconds.
+     * For the current player, accounts for elapsed time since last move.
      */
     public long getRemainingMs(Color color) {
-        if (color == Color.WHITE) {
-            return whiteRemainingMs.get();
-        } else {
-            return blackRemainingMs.get();
+        AtomicLong remaining = color == Color.WHITE ? whiteRemainingMs : blackRemainingMs;
+        long baseTime = remaining.get();
+
+        // If this is the current player, subtract elapsed time
+        if (currentPlayer == color) {
+            long elapsed = System.currentTimeMillis() - lastUpdateTime;
+            return Math.max(0, baseTime - elapsed);
         }
+
+        return baseTime;
     }
 
     /**
@@ -71,12 +79,13 @@ public class GameClock {
 
     /**
      * Get the player who ran out of time, or empty if both have time.
+     * Uses dynamic remaining time calculation (not just stored values).
      */
     public java.util.Optional<Color> getTimeoutPlayer() {
-        if (whiteRemainingMs.get() <= 0) {
+        if (getRemainingMs(Color.WHITE) <= 0) {
             return java.util.Optional.of(Color.WHITE);
         }
-        if (blackRemainingMs.get() <= 0) {
+        if (getRemainingMs(Color.BLACK) <= 0) {
             return java.util.Optional.of(Color.BLACK);
         }
         return java.util.Optional.empty();
@@ -110,12 +119,22 @@ public class GameClock {
      * Get clock state as immutable snapshot for WebSocket events.
      */
     public ClockSnapshot getSnapshot() {
+        long now = System.currentTimeMillis();
         return new ClockSnapshot(
-                whiteRemainingMs.get(),
-                blackRemainingMs.get(),
+                calculateRemainingMs(Color.WHITE, now),
+                calculateRemainingMs(Color.BLACK, now),
                 currentPlayer,
-                System.currentTimeMillis()
+                now
         );
+    }
+
+    private long calculateRemainingMs(Color color, long now) {
+        AtomicLong remaining = color == Color.WHITE ? whiteRemainingMs : blackRemainingMs;
+        if (currentPlayer == color) {
+            long elapsed = now - lastUpdateTime;
+            return Math.max(0, remaining.get() - elapsed);
+        }
+        return remaining.get();
     }
 
     /**

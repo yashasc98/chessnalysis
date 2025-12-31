@@ -40,6 +40,8 @@ public class MatchmakingService {
      */
     @Transactional
     public UUID enterQueue(long userId, TimeControl timeControl) {
+        log.info("User requesting to enter queue: userId={}, timeControl={}", userId, timeControl);
+        
         // Check for duplicate queued entry by user id
         List<MatchQueueEntry> existingEntries = matchQueueEntryRepository.findQueuedEntriesByUser(userId);
         if (!existingEntries.isEmpty()) {
@@ -145,16 +147,16 @@ public class MatchmakingService {
         MatchmakingQueue.Pair p = pair.get();
 
         try {
-            // Generate game ID and create game session
-            UUID gameId = UUID.randomUUID();
-            Game game = gameService.createGame(gameId, p.firstUserId(), p.secondUserId(), timeControl);
-
-            // Determine colors (random)
+          // Determine colors (random) BEFORE creating the game
             boolean whiteIsFirst = RandomGenerator.getDefault().nextBoolean();
             long whitePlayerId = whiteIsFirst ? p.firstUserId() : p.secondUserId();
             long blackPlayerId = whiteIsFirst ? p.secondUserId() : p.firstUserId();
             String firstPlayerColor = whiteIsFirst ? "WHITE" : "BLACK";
             String secondPlayerColor = whiteIsFirst ? "BLACK" : "WHITE";
+
+          // Generate game ID and create game session with correct color assignment
+          UUID gameId = UUID.randomUUID();
+          Game game = gameService.createGame(gameId, whitePlayerId, blackPlayerId, timeControl);
 
             // Update queue entries with matched game
             List<MatchQueueEntry> firstEntries = matchQueueEntryRepository.findQueuedEntriesByUser(p.firstUserId());
