@@ -61,7 +61,7 @@ export default function Landing() {
               </div>
             ))}
           </div>
-          <p className="microcopy">Inspired by lichess-style speed panels — pick, click, and play.</p>
+          {/* <p className="microcopy">Inspired by lichess-style speed panels — pick, click, and play.</p> */}
         </section>
       </main>
 
@@ -79,7 +79,7 @@ export default function Landing() {
         <div className="feature-card">
           <div className="feature-badge">Clean visuals</div>
           <h4>Dark, tournament feel</h4>
-          <p>Modern lichess-inspired palette, subtle depth, and typography tuned for focus.</p>
+          <p>Modern palette, subtle depth, and typography tuned for focus.</p>
         </div>
         <div className="feature-card">
           <div className="feature-badge">Analysis ready</div>

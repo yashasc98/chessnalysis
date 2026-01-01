@@ -129,8 +129,9 @@ public class WebSocketNotifier {
     public void notifyGameStateSync(long userId, UUID gameId, String state, String fen, int moveCount, GameClock.ClockSnapshot clock, GameResult result, String resultReason) {
         try {
             var event = new GameStateSyncEvent(gameId, state, fen, moveCount, clock, result, resultReason);
-            messagingTemplate.convertAndSendToUser(resolvePrincipalName(userId), "/queue/game-sync", event);
-            log.info("Game state sync sent: userId={}, principal={}, gameId={}", userId, resolvePrincipalName(userId), gameId);
+            String destination = "/topic/user." + userId + ".sync";
+            messagingTemplate.convertAndSend(destination, event);
+            log.info("Game state sync sent: userId={}, destination={}, gameId={}", userId, destination, gameId);
         } catch (Exception e) {
             log.error("Failed to send game state sync: userId={}, gameId={}", userId, gameId, e);
         }
@@ -142,8 +143,9 @@ public class WebSocketNotifier {
     public void notifyError(long userId, String errorMessage) {
         try {
             var event = new ErrorMessage(errorMessage);
-            messagingTemplate.convertAndSendToUser(resolvePrincipalName(userId), "/queue/errors", event);
-            log.info("Error message sent: userId={}, principal={}, message={}", userId, resolvePrincipalName(userId), errorMessage);
+            String destination = "/topic/user." + userId + ".errors";
+            messagingTemplate.convertAndSend(destination, event);
+            log.info("Error message sent: userId={}, destination={}, message={}", userId, destination, errorMessage);
         } catch (Exception e) {
             log.error("Failed to send error message: userId={}", userId, e);
         }

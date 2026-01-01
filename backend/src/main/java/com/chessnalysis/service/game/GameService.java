@@ -31,14 +31,25 @@ public class GameService {
      */
     @Transactional
     public Game createGame(UUID gameId, long whitePlayerId, long blackPlayerId, TimeControl timeControl) {
+        log.info("Creating game: gameId={}, white={}, black={}, timeControl={}", gameId, whitePlayerId, blackPlayerId, timeControl);
         Game game = new Game(gameId, whitePlayerId, blackPlayerId, timeControl);
         gameRegistry.register(game);
+        log.info("Game registered in memory: {}", gameId);
+
+        // Auto-start game immediately (clock will start on first move)
+        game.start();
+        log.info("Game auto-started: {}, state={}", gameId, game.getState());
 
         // Persist game metadata
-        GameSession session = GameSession.builder().id(gameId).whitePlayerId(whitePlayerId).blackPlayerId(blackPlayerId).timeControl(timeControl).gameState(GameState.PENDING).currentFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").build();
+        GameSession session = GameSession.builder().id(gameId).whitePlayerId(whitePlayerId).blackPlayerId(blackPlayerId).timeControl(timeControl).gameState(GameState.ACTIVE).currentFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").build();
         gameRepository.save(session);
+        log.info("Game persisted to database: {}", gameId);
 
-        log.info("Game created and registered: {}", gameId);
+        // Notify players game is ready
+        log.info("About to notify game started for: {}", gameId);
+        webSocketNotifier.notifyGameStarted(gameId, whitePlayerId, blackPlayerId, timeControl);
+        log.info("Game creation complete: {}", gameId);
+
         return game;
     }
 

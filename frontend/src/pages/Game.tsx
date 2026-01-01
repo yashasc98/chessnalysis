@@ -77,7 +77,7 @@ export default function Game() {
         })
         subscriptionsRef.current.push(gameSub)
 
-        const syncSub = stompClient.subscribe('/user/queue/game-sync', (msg) => {
+        const syncSub = stompClient.subscribe(`/topic/user.${user?.userId}.sync`, (msg) => {
           const payload: GameStateSyncEvent = JSON.parse(msg.body)
           if (payload.gameId === gameId) {
             applyGameSync(payload)
@@ -85,7 +85,7 @@ export default function Game() {
         })
         subscriptionsRef.current.push(syncSub)
 
-        const errorSub = stompClient.subscribe('/user/queue/errors', (msg) => {
+        const errorSub = stompClient.subscribe(`/topic/user.${user?.userId}.errors`, (msg) => {
           const payload = JSON.parse(msg.body)
           setGameState((s) => ({ ...s, lastError: payload.message }))
         })
@@ -143,6 +143,19 @@ export default function Game() {
     }
   }
 
+  function getMovePairs(): Array<{ moveNumber: number; white: string; black?: string }> {
+    const pairs = []
+    for (let i = 0; i < moveHistory.length; i += 2) {
+      const moveNumber = i / 2 + 1
+      pairs.push({
+        moveNumber,
+        white: moveHistory[i],
+        black: moveHistory[i + 1]
+      })
+    }
+    return pairs
+  }
+
   function applyMoveEvent(event: MoveAppliedEvent) {
     try {
       if (!event.fen) {
@@ -150,12 +163,19 @@ export default function Game() {
         return
       }
       chessRef.current.load(event.fen)
+      const currentTurn = chessRef.current.turn()
       setGameState((s) => ({
         ...s,
         fen: event.fen,
-        currentTurn: chessRef.current.turn()
+        currentTurn
       }))
-      setMoveHistory((prev) => [...prev, event.sanNotation])
+      // Only add if this move isn't already in history (prevent duplicates)
+      setMoveHistory((prev) => {
+        if (prev.length > 0 && prev[prev.length - 1] === event.sanNotation) {
+          return prev
+        }
+        return [...prev, event.sanNotation]
+      })
     } catch (e) {
       console.error('Failed to load FEN from move event:', e)
       setGameState((s) => ({ ...s, lastError: 'Failed to apply move' }))
@@ -173,16 +193,6 @@ export default function Game() {
       }))
     } catch (e) {
       console.error('Failed to load FEN from sync event:', e)
-    }
-  }
-
-  async function handleStartGame() {
-    if (!gameId) return
-    try {
-      await stompClient.send(`/app/game/${gameId}/start`, {})
-    } catch (e) {
-      console.error('Failed to start game:', e)
-      setGameState((s) => ({ ...s, lastError: 'Failed to start game' }))
     }
   }
 
@@ -325,9 +335,6 @@ export default function Game() {
             </div>
 
             <div className="button-stack">
-              {gameState.status === 'PENDING' && (
-                <button className="btn primary" onClick={handleStartGame}>Start game</button>
-              )}
               {gameState.status === 'ACTIVE' && (
                 <button className="btn ghost" onClick={handleResign}>Resign</button>
               )}
@@ -337,14 +344,16 @@ export default function Game() {
           <div className="panel">
             <div className="panel-head">
               <div className="eyebrow">Moves</div>
-              <div className="microcopy">SAN list</div>
+              <div className="microcopy">Move History</div>
             </div>
             {moveHistory.length === 0 ? (
               <div className="empty">No moves yet.</div>
             ) : (
               <ol className="moves-list">
-                {moveHistory.map((move, idx) => (
-                  <li key={`${move}-${idx}`}>{move}</li>
+                {getMovePairs().map((pair) => (
+                  <li key={pair.moveNumber}>
+                    {pair.white} {pair.black ? pair.black : ''}
+                  </li>
                 ))}
               </ol>
             )}
