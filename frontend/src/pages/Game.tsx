@@ -234,6 +234,12 @@ export default function Game() {
         blackPlayerId: event.blackPlayerId,
         opponentId
       }))
+      
+      // Restore move history from sync event
+      if (event.moves && event.moves.length > 0) {
+        console.log('Restoring move history:', event.moves)
+        setMoveHistory(event.moves)
+      }
     } catch (e) {
       console.error('Failed to load FEN from sync event:', e)
     }

@@ -53,6 +53,7 @@ export type GameStateSyncEvent = {
   resultReason?: string
   whitePlayerId: number
   blackPlayerId: number
+  moves: string[]
 }
 
 export type IllegalMoveEvent = { 

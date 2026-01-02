@@ -1,5 +1,6 @@
 package com.chessnalysis.service.game;
 
+import com.chessnalysis.dao.game.GameMoveRepository;
 import com.chessnalysis.dao.game.GameRepository;
 import com.chessnalysis.domain.game.*;
 import com.chessnalysis.exception.ResourceNotFoundException;
@@ -23,6 +24,7 @@ public class GameService {
 
     private final GameRegistry gameRegistry;
     private final GameRepository gameRepository;
+    private final GameMoveRepository gameMoveRepository;
     private final WebSocketNotifier webSocketNotifier;
 
     /**
@@ -112,6 +114,20 @@ public class GameService {
             }
 
             gameRepository.save(session);
+
+            // Save the move to game_moves table
+            String fromSquare = moveUci.substring(0, 2);
+            String toSquare = moveUci.substring(2, 4);
+            GameMove move = GameMove.builder()
+                    .gameId(gameId)
+                    .moveNumber(game.getEngine().getMoveCount())
+                    .fromSquare(fromSquare)
+                    .toSquare(toSquare)
+                    .moveUci(moveUci)
+                    .sanNotation(san)
+                    .byPlayerId(playerId)
+                    .build();
+            gameMoveRepository.save(move);
 
             // Notify both players
             webSocketNotifier.notifyMoveApplied(gameId, moveUci, san, movedColor, game.getEngine().getMoveCount(), game.getEngine().getFen(), game.getClock().getSnapshot());

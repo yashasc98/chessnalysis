@@ -3,6 +3,7 @@ package com.chessnalysis.dto.game;
 import com.chessnalysis.domain.game.GameResult;
 import com.chessnalysis.service.game.GameClock;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -17,7 +18,8 @@ public record GameStateSyncEvent(
         GameResult result,
         String resultReason,
         long whitePlayerId,
-        long blackPlayerId
+        long blackPlayerId,
+        List<String> moves
 ) {
 }
 
