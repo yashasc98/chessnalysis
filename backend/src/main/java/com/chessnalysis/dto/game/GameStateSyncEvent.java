@@ -15,7 +15,9 @@ public record GameStateSyncEvent(
         int moveCount,
         GameClock.ClockSnapshot clock,
         GameResult result,
-        String resultReason
+        String resultReason,
+        long whitePlayerId,
+        long blackPlayerId
 ) {
 }
 

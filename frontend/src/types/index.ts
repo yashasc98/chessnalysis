@@ -50,7 +50,9 @@ export type GameStateSyncEvent = {
   moveCount: number
   clock: any
   result?: any
-  resultReason?: string 
+  resultReason?: string
+  whitePlayerId: number
+  blackPlayerId: number
 }
 
 export type IllegalMoveEvent = { 

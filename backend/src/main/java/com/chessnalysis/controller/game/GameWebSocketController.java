@@ -135,7 +135,7 @@ public class GameWebSocketController {
 
             // Get current game snapshot and send to player
             gameService.getGameSnapshot(gameUuid, game -> {
-                webSocketNotifier.notifyGameStateSync(userDetails.userId(), gameUuid, game.getState().name(), game.getEngine().getFen(), game.getEngine().getMoveCount(), game.getClock().getSnapshot(), game.getResult(), game.getResultReason());
+                webSocketNotifier.notifyGameStateSync(userDetails.userId(), gameUuid, game.getState().name(), game.getEngine().getFen(), game.getEngine().getMoveCount(), game.getClock().getSnapshot(), game.getResult(), game.getResultReason(), game.getWhitePlayerId(), game.getBlackPlayerId());
                 return null;
             });
 

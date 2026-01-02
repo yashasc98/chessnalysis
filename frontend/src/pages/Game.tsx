@@ -64,38 +64,66 @@ export default function Game() {
   const subscriptionsRef = useRef<any[]>([])
 
   useEffect(() => {
-    if (!gameId || !user) return
+    if (!gameId || !user?.userId) {
+      console.log('Game setup skipped: missing gameId or userId', { gameId, userId: user?.userId })
+      return
+    }
 
     const setupGame = async () => {
       try {
+        console.log('Setting up game:', { gameId, userId: user.userId })
         await stompClient.waitForConnection()
+        console.log('WebSocket connected')
+
+        // Unsubscribe from any previous subscriptions for this game
+        subscriptionsRef.current.forEach((sub) => sub?.unsubscribe?.())
+        subscriptionsRef.current = []
+
+        // Add small delay to ensure STOMP client is fully ready for subscriptions
+        // This prevents "no underlying STOMP connection" errors on rapid reconnects
+        await new Promise(resolve => setTimeout(resolve, 50))
 
         const gameTopic = `/topic/game.${gameId}`
-        const gameSub = stompClient.subscribe(gameTopic, (msg) => {
-          const payload = JSON.parse(msg.body)
-          handleGameEvent(payload)
-        })
+        console.log('Subscribing to:', gameTopic)
+        let gameSub
+        try {
+          gameSub = stompClient.subscribe(gameTopic, (msg) => {
+            const payload = JSON.parse(msg.body)
+            handleGameEvent(payload)
+          })
+        } catch (e) {
+          console.error('Failed to subscribe to game topic:', e)
+          throw e
+        }
         subscriptionsRef.current.push(gameSub)
 
-        const syncSub = stompClient.subscribe(`/topic/user.${user?.userId}.sync`, (msg) => {
+        const syncTopic = `/topic/user.${user.userId}.sync`
+        console.log('Subscribing to:', syncTopic)
+        const syncSub = stompClient.subscribe(syncTopic, (msg) => {
           const payload: GameStateSyncEvent = JSON.parse(msg.body)
+          console.log('Received sync event:', payload)
           if (payload.gameId === gameId) {
             applyGameSync(payload)
           }
         })
         subscriptionsRef.current.push(syncSub)
 
-        const errorSub = stompClient.subscribe(`/topic/user.${user?.userId}.errors`, (msg) => {
+        const errorTopic = `/topic/user.${user.userId}.errors`
+        console.log('Subscribing to:', errorTopic)
+        const errorSub = stompClient.subscribe(errorTopic, (msg) => {
           const payload = JSON.parse(msg.body)
+          console.log('Received error event:', payload)
           setGameState((s) => ({ ...s, lastError: payload.message }))
         })
         subscriptionsRef.current.push(errorSub)
 
-        await stompClient.send(`/app/game/${gameId}/sync`, {})
+        console.log('Sending sync request for game:', gameId)
+        await stompClient.send(`/app/game/${gameId}/sync`, { reason: 'reconnection' })
+        console.log('Sync request sent')
         setGameState((s) => ({ ...s, status: 'PENDING' }))
       } catch (e) {
         console.error('Failed to setup game:', e)
-        setGameState((s) => ({ ...s, lastError: 'Failed to connect to game' }))
+        setGameState((s) => ({ ...s, lastError: `Failed to connect to game: ${e instanceof Error ? e.message : String(e)}` }))
       }
     }
 
@@ -105,7 +133,7 @@ export default function Game() {
       subscriptionsRef.current.forEach((sub) => sub?.unsubscribe?.())
       subscriptionsRef.current = []
     }
-  }, [gameId, user])
+  }, [gameId, user?.userId])
 
   useEffect(() => {
     if (!user || !gameState.myColor || gameState.status !== 'ACTIVE') {
@@ -184,12 +212,27 @@ export default function Game() {
 
   function applyGameSync(event: GameStateSyncEvent) {
     try {
+      console.log('applyGameSync called with event:', event)
       chessRef.current.load(event.fen)
+      
+      // Determine player's color based on their user ID
+      const myColor = user?.userId === event.whitePlayerId ? 'white' 
+                    : user?.userId === event.blackPlayerId ? 'black' 
+                    : null
+      
+      console.log('Determined myColor:', myColor, { userUserId: user?.userId, whitePlayerId: event.whitePlayerId, blackPlayerId: event.blackPlayerId })
+      
+      const opponentId = myColor === 'white' ? event.blackPlayerId : event.whitePlayerId
+      
       setGameState((s) => ({
         ...s,
         fen: event.fen,
         currentTurn: chessRef.current.turn(),
-        status: event.state as 'PENDING' | 'ACTIVE' | 'ENDED'
+        status: event.state as 'PENDING' | 'ACTIVE' | 'ENDED',
+        myColor,
+        whitePlayerId: event.whitePlayerId,
+        blackPlayerId: event.blackPlayerId,
+        opponentId
       }))
     } catch (e) {
       console.error('Failed to load FEN from sync event:', e)

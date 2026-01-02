@@ -126,9 +126,9 @@ public class WebSocketNotifier {
     /**
      * Send a full game state sync to a player (on reconnection).
      */
-    public void notifyGameStateSync(long userId, UUID gameId, String state, String fen, int moveCount, GameClock.ClockSnapshot clock, GameResult result, String resultReason) {
+    public void notifyGameStateSync(long userId, UUID gameId, String state, String fen, int moveCount, GameClock.ClockSnapshot clock, GameResult result, String resultReason, long whitePlayerId, long blackPlayerId) {
         try {
-            var event = new GameStateSyncEvent(gameId, state, fen, moveCount, clock, result, resultReason);
+            var event = new GameStateSyncEvent(gameId, state, fen, moveCount, clock, result, resultReason, whitePlayerId, blackPlayerId);
             String destination = "/topic/user." + userId + ".sync";
             messagingTemplate.convertAndSend(destination, event);
             log.info("Game state sync sent: userId={}, destination={}, gameId={}", userId, destination, gameId);
